@@ -3,90 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdgeMant - Dashboard</title>
+    <title>EdgeMant | Asistente operativo</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
 </head>
-<body>
-    <header>
-        <h1>EdgeMant</h1>
-        <p>Sistema de mantenimiento predictivo - Bombas centrifugas</p>
+<body class="asistente-body">
+    <header class="asistente-header">
+        <div class="marca-edgemant">
+            <div class="marca-icono" aria-hidden="true">E</div>
+            <div>
+                <h1>EdgeMant</h1>
+                <p>Asistente operativo de estaciones de bombeo</p>
+            </div>
+        </div>
+        <span id="conexion-estado" class="conexion-estado"><span class="punto"></span> Conectando</span>
     </header>
 
-    <main>
-        <section class="resumen">
-            <h2>Resumen</h2>
-            <div class="cards">
-                <div class="card">
-                    <span class="label">Registros almacenados</span>
-                    <span class="valor" id="total-registros">-</span>
-                </div>
-                <div class="card">
-                    <span class="label">Posibles anomalias</span>
-                    <span class="valor" id="total-anomalias">-</span>
-                </div>
-                <div class="card">
-                    <span class="label">Motores monitoreados</span>
-                    <span class="valor" id="total-motores">-</span>
-                </div>
-                <div class="card">
-                    <span class="label">Umbral</span>
-                    <span class="valor" id="umbral">-</span>
+    <main class="asistente-main">
+        <section class="asistente-panel" aria-labelledby="estado-titulo">
+            <div class="panel-topline">
+                <span class="panel-etiqueta">ESTADO ACTUAL DE LA ESTACIÓN</span>
+                <span id="estado-prioridad" class="prioridad">EVALUANDO</span>
+            </div>
+            <h2 id="estado-titulo">Consultando el estado operativo<span class="cursor-escritura" aria-hidden="true"></span></h2>
+            <div id="conversacion" class="conversacion" aria-live="polite" aria-atomic="false">
+                <div class="mensaje mensaje-edgemant">
+                    <div class="avatar-edgemant">E</div>
+                    <div class="mensaje-cuerpo">
+                        <div class="mensaje-autor">EdgeMant <span id="hora-analisis"></span></div>
+                        <p id="diagnostico-texto">Estoy revisando la información disponible de la estación...</p>
+                    </div>
                 </div>
             </div>
-        </section>
-
-        <section class="acciones">
-            <button id="btn-inferir">Ejecutar inferencia</button>
-            <span id="estado-inferencia"></span>
-        </section>
-
-        <section class="ultimas-anomalias">
-            <h2>Ultimas posibles anomalias</h2>
-            <div class="tabla-contenedor">
-                <table id="tabla-anomalias">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Hora</th>
-                            <th>Motor</th>
-                            <th>Severidad</th>
-                            <th>Error</th>
-                            <th>Interpretacion</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+            <div id="preguntas-rapidas" class="preguntas-rapidas" aria-label="Preguntas sugeridas">
+                <button type="button" class="pregunta-btn">¿Cuál es la posible causa?</button>
+                <button type="button" class="pregunta-btn">¿Qué debo revisar primero?</button>
+                <button type="button" class="pregunta-btn">¿Cómo confirmo que se solucionó?</button>
             </div>
-        </section>
-
-        <section class="apoyo-operador" aria-labelledby="titulo-apoyo-operador">
-            <div class="apoyo-operador__encabezado">
-                <div>
-                    <h2 id="titulo-apoyo-operador">Apoyo al operador</h2>
-                    <p>Plan de revisión para el operador según la última detección y la calidad de la clasificación.</p>
-                </div>
-                <span id="apoyo-estado" class="apoyo-operador__estado">SIN DETECCIONES</span>
-            </div>
-            <div id="apoyo-contenido" class="apoyo-operador__contenido" aria-live="polite">
-                <p class="apoyo-operador__vacio">Cargando resultados del modelo...</p>
-            </div>
-            <p class="apoyo-operador__nota">Esta orientación es una ayuda para la revisión técnica; no sustituye los procedimientos de seguridad, los manuales del equipo ni el criterio del personal responsable.</p>
-        </section>
-
-        <section class="estado-motores">
-            <h2>Estado de motores</h2>
-            <div id="lista-motores" class="motores-grid"></div>
-        </section>
-
-        <section class="grafico">
-            <h2>Error de reconstrucción de posibles anomalías vs umbral</h2>
-            <canvas id="grafico-error"></canvas>
+            <form id="form-pregunta" class="entrada-pregunta">
+                <input id="pregunta-operador" type="text" maxlength="500" autocomplete="off"
+                    placeholder="Pregunta sobre el estado de la estación..." aria-label="Pregunta para EdgeMant">
+                <button id="enviar-pregunta" type="submit" aria-label="Enviar pregunta"><span aria-hidden="true">↑</span></button>
+            </form>
+            <p class="nota-seguridad">EdgeMant ofrece orientación basada en los datos disponibles. Confirma las condiciones en campo y sigue los procedimientos de seguridad de la estación.</p>
         </section>
     </main>
-
-    <footer>
-        <p>EdgeMant - Etapa 3 - Dashboard</p>
-    </footer>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
