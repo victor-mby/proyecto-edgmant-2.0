@@ -47,6 +47,19 @@ class TestApoyoOperador(unittest.TestCase):
         self.assertIsNone(apoyo["deteccion"])
         self.assertTrue(apoyo["acciones"])
 
+    def test_resultados_fuera_de_regimen_quedan_para_revision(self):
+        apoyo = construir_apoyo_operador(
+            None,
+            total_registros=0,
+            total_detecciones=0,
+            total_detecciones_revision=5518,
+        )
+
+        self.assertEqual(apoyo["estado"], "VALIDAR_MODELO")
+        self.assertEqual(apoyo["detecciones_pendientes_revision"], 5518)
+        self.assertIn("no se borraron", apoyo["advertencia"])
+        self.assertIn("OPERATIVO", apoyo["resumen"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
