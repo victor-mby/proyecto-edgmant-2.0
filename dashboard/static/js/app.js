@@ -20,6 +20,7 @@ async function cargarDashboard() {
         const tbody = document.querySelector('#tabla-anomalias tbody');
         tbody.replaceChildren();
         const historial = datos.historial || [];
+        actualizarApoyoOperador(historial[0]);
         historial.forEach((deteccion) => {
             const tr = document.createElement('tr');
             const valores = [
@@ -69,6 +70,107 @@ async function cargarDashboard() {
         const estado = document.getElementById('estado-inferencia');
         if (estado) estado.textContent = 'No se pudo cargar el dashboard. Revisa la base de datos y el servidor.';
     }
+}
+
+function actualizarApoyoOperador(deteccion) {
+    const estado = document.getElementById('apoyo-estado');
+    const contenedor = document.getElementById('apoyo-contenido');
+    if (!estado || !contenedor) return;
+
+    contenedor.replaceChildren();
+
+    if (!deteccion) {
+        estado.className = 'apoyo-operador__estado';
+        estado.textContent = 'SIN DETECCIONES';
+        const mensaje = document.createElement('p');
+        mensaje.className = 'apoyo-operador__vacio';
+        mensaje.textContent = 'El modelo todavía no ha registrado posibles anomalías. Cuando registre una, aquí aparecerán su interpretación y las variables relevantes.';
+        contenedor.appendChild(mensaje);
+        return;
+    }
+
+    const severidad = String(deteccion.severidad || 'ATENCION').toUpperCase();
+    estado.className = 'apoyo-operador__estado';
+    if (severidad === 'CRITICO') {
+        estado.classList.add('apoyo-operador__estado--critico');
+        estado.textContent = 'REVISIÓN PRIORITARIA';
+    } else {
+        estado.classList.add('apoyo-operador__estado--atencion');
+        estado.textContent = 'REVISAR';
+    }
+
+    const titulo = document.createElement('h3');
+    titulo.className = 'apoyo-operador__titulo';
+    titulo.textContent = deteccion.tipo_interpretacion || 'Posible comportamiento anómalo';
+
+    const metadatos = document.createElement('p');
+    metadatos.className = 'apoyo-operador__metadatos';
+    metadatos.textContent = [
+        'Motor: ' + (deteccion.motor_id || 'No identificado'),
+        'Fecha: ' + (deteccion.fecha || 'No disponible'),
+        'Hora: ' + (deteccion.hora || 'No disponible'),
+        'Severidad: ' + severidad,
+        Number.isFinite(Number(deteccion.error_reconstruccion))
+            ? 'Error de reconstrucción: ' + Number(deteccion.error_reconstruccion).toFixed(4)
+            : null,
+        Number.isFinite(Number(deteccion.umbral))
+            ? 'Umbral: ' + Number(deteccion.umbral).toFixed(4)
+            : null,
+    ].filter(Boolean).join(' · ');
+
+    const bloqueRecomendacion = document.createElement('div');
+    bloqueRecomendacion.className = 'apoyo-operador__recomendacion';
+    const etiqueta = document.createElement('strong');
+    etiqueta.textContent = 'Orientación sugerida';
+    const recomendacion = document.createElement('p');
+    recomendacion.textContent = deteccion.descripcion ||
+        'Revisar el equipo y contrastar las variables con los procedimientos técnicos aplicables.';
+    bloqueRecomendacion.append(etiqueta, recomendacion);
+
+    const variablesTitulo = document.createElement('strong');
+    variablesTitulo.textContent = 'Variables relevantes';
+    variablesTitulo.style.fontSize = '0.9rem';
+
+    const nombresVariables = {
+        nivel: 'Nivel',
+        nivel_porcentaje: 'Nivel (%)',
+        voltaje: 'Tensión de red',
+        voltaje_terminal: 'Tensión terminal',
+        amperaje: 'Amperaje',
+        corriente_total: 'Corriente total',
+        caudal: 'Caudal',
+        potencia: 'Potencia',
+        carga: 'Carga',
+        altura: 'Altura',
+        factor_potencia: 'Factor de potencia',
+        caudal_total: 'Caudal total',
+        potencia_total: 'Potencia total',
+        nivel_destino: 'Nivel de destino',
+        demanda: 'Demanda',
+        posicion_valvula: 'Posición de válvula',
+        velocidad_rotacion: 'Velocidad de rotación',
+        horas_operacion: 'Horas de operación',
+    };
+    const variables = document.createElement('div');
+    variables.className = 'apoyo-operador__variables';
+    const relevantes = Array.isArray(deteccion.variables_relevantes)
+        ? deteccion.variables_relevantes
+        : [];
+    if (relevantes.length) {
+        relevantes.forEach((variable) => {
+            const etiquetaVariable = document.createElement('span');
+            etiquetaVariable.className = 'apoyo-operador__variable';
+            etiquetaVariable.textContent = nombresVariables[variable] || String(variable);
+            variables.appendChild(etiquetaVariable);
+        });
+    } else {
+        const sinVariables = document.createElement('p');
+        sinVariables.className = 'apoyo-operador__vacio';
+        sinVariables.textContent = 'No se guardaron variables específicas para esta detección.';
+        variables.appendChild(sinVariables);
+    }
+
+    contenedor.append(titulo, metadatos, bloqueRecomendacion, variablesTitulo, variables);
 }
 
 function dibujarGrafico(historial) {
