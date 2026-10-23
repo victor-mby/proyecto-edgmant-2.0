@@ -20,7 +20,7 @@ async function cargarDashboard() {
         const tbody = document.querySelector('#tabla-anomalias tbody');
         tbody.replaceChildren();
         const historial = datos.historial || [];
-        actualizarApoyoOperador(historial[0]);
+        actualizarApoyoOperador(datos.apoyo_operador || null);
         historial.forEach((deteccion) => {
             const tr = document.createElement('tr');
             const valores = [
@@ -72,105 +72,132 @@ async function cargarDashboard() {
     }
 }
 
-function actualizarApoyoOperador(deteccion) {
+function actualizarApoyoOperador(apoyo) {
     const estado = document.getElementById('apoyo-estado');
     const contenedor = document.getElementById('apoyo-contenido');
     if (!estado || !contenedor) return;
 
     contenedor.replaceChildren();
-
-    if (!deteccion) {
+    if (!apoyo) {
         estado.className = 'apoyo-operador__estado';
-        estado.textContent = 'SIN DETECCIONES';
+        estado.textContent = 'SIN DATOS';
         const mensaje = document.createElement('p');
         mensaje.className = 'apoyo-operador__vacio';
-        mensaje.textContent = 'El modelo todavía no ha registrado posibles anomalías. Cuando registre una, aquí aparecerán su interpretación y las variables relevantes.';
+        mensaje.textContent = 'No se pudo obtener el plan de apoyo. Recarga el dashboard para volver a consultar los resultados.';
         contenedor.appendChild(mensaje);
         return;
     }
 
-    const severidad = String(deteccion.severidad || 'ATENCION').toUpperCase();
+    const modo = String(apoyo.estado || 'VIGILANCIA').toUpperCase();
     estado.className = 'apoyo-operador__estado';
-    if (severidad === 'CRITICO') {
-        estado.classList.add('apoyo-operador__estado--critico');
-        estado.textContent = 'REVISIÓN PRIORITARIA';
+    if (modo === 'VALIDAR_MODELO') {
+        estado.classList.add('apoyo-operador__estado--validar');
+        estado.textContent = 'VALIDAR MODELO';
+    } else if (modo === 'REVISION_TECNICA') {
+        const severidad = String(apoyo.deteccion?.severidad_modelo || '').toUpperCase();
+        estado.classList.add(severidad === 'CRITICO'
+            ? 'apoyo-operador__estado--critico'
+            : 'apoyo-operador__estado--atencion');
+        estado.textContent = severidad === 'CRITICO' ? 'REVISIÓN PRIORITARIA' : 'REVISAR';
     } else {
-        estado.classList.add('apoyo-operador__estado--atencion');
-        estado.textContent = 'REVISAR';
+        estado.textContent = 'VIGILANCIA';
     }
 
     const titulo = document.createElement('h3');
     titulo.className = 'apoyo-operador__titulo';
-    titulo.textContent = deteccion.tipo_interpretacion || 'Posible comportamiento anómalo';
+    titulo.textContent = apoyo.titulo || 'Apoyo operativo';
 
-    const metadatos = document.createElement('p');
-    metadatos.className = 'apoyo-operador__metadatos';
-    metadatos.textContent = [
-        'Motor: ' + (deteccion.motor_id || 'No identificado'),
-        'Fecha: ' + (deteccion.fecha || 'No disponible'),
-        'Hora: ' + (deteccion.hora || 'No disponible'),
-        'Severidad: ' + severidad,
-        Number.isFinite(Number(deteccion.error_reconstruccion))
-            ? 'Error de reconstrucción: ' + Number(deteccion.error_reconstruccion).toFixed(4)
-            : null,
-        Number.isFinite(Number(deteccion.umbral))
-            ? 'Umbral: ' + Number(deteccion.umbral).toFixed(4)
-            : null,
-    ].filter(Boolean).join(' · ');
+    const resumen = document.createElement('p');
+    resumen.className = 'apoyo-operador__resumen';
+    resumen.textContent = apoyo.resumen || '';
 
-    const bloqueRecomendacion = document.createElement('div');
-    bloqueRecomendacion.className = 'apoyo-operador__recomendacion';
-    const etiqueta = document.createElement('strong');
-    etiqueta.textContent = 'Orientación sugerida';
-    const recomendacion = document.createElement('p');
-    recomendacion.textContent = deteccion.descripcion ||
-        'Revisar el equipo y contrastar las variables con los procedimientos técnicos aplicables.';
-    bloqueRecomendacion.append(etiqueta, recomendacion);
+    contenedor.append(titulo, resumen);
 
-    const variablesTitulo = document.createElement('strong');
-    variablesTitulo.textContent = 'Variables relevantes';
-    variablesTitulo.style.fontSize = '0.9rem';
-
-    const nombresVariables = {
-        nivel: 'Nivel',
-        nivel_porcentaje: 'Nivel (%)',
-        voltaje: 'Tensión de red',
-        voltaje_terminal: 'Tensión terminal',
-        amperaje: 'Amperaje',
-        corriente_total: 'Corriente total',
-        caudal: 'Caudal',
-        potencia: 'Potencia',
-        carga: 'Carga',
-        altura: 'Altura',
-        factor_potencia: 'Factor de potencia',
-        caudal_total: 'Caudal total',
-        potencia_total: 'Potencia total',
-        nivel_destino: 'Nivel de destino',
-        demanda: 'Demanda',
-        posicion_valvula: 'Posición de válvula',
-        velocidad_rotacion: 'Velocidad de rotación',
-        horas_operacion: 'Horas de operación',
-    };
-    const variables = document.createElement('div');
-    variables.className = 'apoyo-operador__variables';
-    const relevantes = Array.isArray(deteccion.variables_relevantes)
-        ? deteccion.variables_relevantes
-        : [];
-    if (relevantes.length) {
-        relevantes.forEach((variable) => {
-            const etiquetaVariable = document.createElement('span');
-            etiquetaVariable.className = 'apoyo-operador__variable';
-            etiquetaVariable.textContent = nombresVariables[variable] || String(variable);
-            variables.appendChild(etiquetaVariable);
-        });
-    } else {
-        const sinVariables = document.createElement('p');
-        sinVariables.className = 'apoyo-operador__vacio';
-        sinVariables.textContent = 'No se guardaron variables específicas para esta detección.';
-        variables.appendChild(sinVariables);
+    if (apoyo.advertencia) {
+        const advertencia = document.createElement('div');
+        advertencia.className = modo === 'VALIDAR_MODELO'
+            ? 'apoyo-operador__alerta apoyo-operador__alerta--modelo'
+            : 'apoyo-operador__alerta';
+        const subtitulo = document.createElement('strong');
+        subtitulo.textContent = modo === 'VALIDAR_MODELO'
+            ? 'Control de calidad del modelo'
+            : 'Precaución';
+        const texto = document.createElement('p');
+        texto.textContent = apoyo.advertencia;
+        advertencia.append(subtitulo, texto);
+        contenedor.appendChild(advertencia);
     }
 
-    contenedor.append(titulo, metadatos, bloqueRecomendacion, variablesTitulo, variables);
+    const deteccion = apoyo.deteccion;
+    if (deteccion) {
+        const metadatos = document.createElement('p');
+        metadatos.className = 'apoyo-operador__metadatos';
+        const datosMeta = [
+            'Motor: ' + (deteccion.motor_id || 'No identificado'),
+            'Fecha: ' + (deteccion.fecha || 'No disponible'),
+            'Hora: ' + (deteccion.hora || 'No disponible'),
+            'Severidad del modelo: ' + (deteccion.severidad_modelo || 'No clasificada'),
+        ];
+        if (Number.isFinite(deteccion.error_reconstruccion)) {
+            datosMeta.push('Error: ' + deteccion.error_reconstruccion.toFixed(4));
+        }
+        if (Number.isFinite(deteccion.umbral)) {
+            datosMeta.push('Umbral: ' + deteccion.umbral.toFixed(6));
+        }
+        metadatos.textContent = datosMeta.join(' · ');
+        contenedor.appendChild(metadatos);
+    }
+
+    const accionesTitulo = document.createElement('strong');
+    accionesTitulo.className = 'apoyo-operador__seccion-titulo';
+    accionesTitulo.textContent = modo === 'VALIDAR_MODELO'
+        ? 'Comprobaciones previas a interpretar la alerta'
+        : 'Pasos sugeridos para el operador';
+
+    const listaAcciones = document.createElement('ol');
+    listaAcciones.className = 'apoyo-operador__acciones';
+    (Array.isArray(apoyo.acciones) ? apoyo.acciones : []).forEach((accion) => {
+        const item = document.createElement('li');
+        item.textContent = String(accion);
+        listaAcciones.appendChild(item);
+    });
+    contenedor.append(accionesTitulo, listaAcciones);
+
+    const variables = Array.isArray(apoyo.variables) ? apoyo.variables : [];
+    if (variables.length) {
+        const variablesTitulo = document.createElement('strong');
+        variablesTitulo.className = 'apoyo-operador__seccion-titulo';
+        variablesTitulo.textContent = 'Variables señaladas por la interpretación';
+        const etiquetas = document.createElement('div');
+        etiquetas.className = 'apoyo-operador__variables';
+        const nombres = {
+            nivel: 'Nivel', nivel_porcentaje: 'Nivel (%)',
+            voltaje: 'Tensión de red', voltaje_terminal: 'Tensión terminal',
+            amperaje: 'Amperaje', corriente_total: 'Corriente total',
+            caudal: 'Caudal', potencia: 'Potencia', carga: 'Carga',
+            altura: 'Altura', factor_potencia: 'Factor de potencia',
+            caudal_total: 'Caudal total', potencia_total: 'Potencia total',
+            nivel_destino: 'Nivel destino', demanda: 'Demanda',
+            posicion_valvula: 'Posición de válvula',
+            velocidad_rotacion: 'Velocidad de rotación',
+            horas_operacion: 'Horas de operación'
+        };
+        variables.forEach((variable) => {
+            const etiquetaVariable = document.createElement('span');
+            etiquetaVariable.className = 'apoyo-operador__variable';
+            etiquetaVariable.textContent = nombres[variable] || String(variable);
+            etiquetas.appendChild(etiquetaVariable);
+        });
+        contenedor.append(variablesTitulo, etiquetas);
+    }
+
+    if (Number.isFinite(apoyo.porcentaje_anomalias)) {
+        const tasa = document.createElement('p');
+        tasa.className = 'apoyo-operador__metadatos';
+        tasa.textContent = 'Registros clasificados como posibles anomalías: '
+            + apoyo.porcentaje_anomalias.toFixed(2) + '% del total almacenado.';
+        contenedor.appendChild(tasa);
+    }
 }
 
 function dibujarGrafico(historial) {
