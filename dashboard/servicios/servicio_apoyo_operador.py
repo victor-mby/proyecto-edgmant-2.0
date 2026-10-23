@@ -99,30 +99,38 @@ def construir_apoyo_operador(
 
     tipo = metadatos["tipo_interpretacion"].casefold()
     vars_normalizadas = {variable.casefold() for variable in variables}
-    if (
-        "electric" in tipo
-        or vars_normalizadas.intersection(
-            {"voltaje", "voltaje_terminal", "amperaje", "corriente_total", "factor_potencia"}
-        )
+    if "sobrecarga" in tipo:
+        acciones = [
+            "Comparar corriente, potencia y carga con los valores nominales de placa y con el historial reciente del motor.",
+            "Si la desviación se confirma, solicitar la inspección del equipo conforme al procedimiento de mantenimiento y seguridad de la instalación.",
+        ]
+    elif "electric" in tipo:
+        acciones = [
+            "Contrastar tensión de red, tensión en terminales y corriente con la placa del motor y los límites de la instalación.",
+            "Revisar tendencias y consistencia de las lecturas eléctricas; si se confirma una desviación, solicitar inspección al personal autorizado según el procedimiento de seguridad.",
+        ]
+    elif "hidraulic" in tipo or "flujo" in tipo or "caudal" in tipo:
+        acciones = [
+            "Comparar caudal, nivel de succión/destino y posición de la válvula con el punto de operación esperado.",
+            "Verificar visualmente la posición de las válvulas y comprobar si hay indicios de obstrucción, fuga o entrada de aire, siguiendo el procedimiento de la estación.",
+            "Confirmar las lecturas con instrumentos o tendencias independientes antes de intervenir en la bomba.",
+        ]
+    elif vars_normalizadas.intersection(
+        {"voltaje", "voltaje_terminal", "amperaje", "corriente_total", "factor_potencia"}
     ):
         acciones = [
             "Contrastar tensión de red, tensión en terminales y corriente con la placa del motor y los límites de la instalación.",
             "Revisar tendencias y consistencia de las lecturas eléctricas; si se confirma una desviación, solicitar inspección al personal autorizado según el procedimiento de seguridad.",
         ]
-    elif (
-        "hidraulic" in tipo
-        or "flujo" in tipo
-        or "caudal" in tipo
-        or vars_normalizadas.intersection(
-            {"caudal", "caudal_total", "nivel", "nivel_destino", "posicion_valvula", "altura", "demanda"}
-        )
+    elif vars_normalizadas.intersection(
+        {"caudal", "caudal_total", "nivel", "nivel_destino", "posicion_valvula", "altura", "demanda"}
     ):
         acciones = [
             "Comparar caudal, nivel de succión/destino y posición de la válvula con el punto de operación esperado.",
             "Verificar visualmente la posición de las válvulas y comprobar si hay indicios de obstrucción, fuga o entrada de aire, siguiendo el procedimiento de la estación.",
             "Confirmar las lecturas con instrumentos o tendencias independientes antes de intervenir en la bomba.",
         ]
-    elif "sobrecarga" in tipo or vars_normalizadas.intersection(
+    elif vars_normalizadas.intersection(
         {"carga", "potencia", "potencia_total", "amperaje", "corriente_total"}
     ):
         acciones = [
