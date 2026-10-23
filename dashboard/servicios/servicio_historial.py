@@ -5,8 +5,8 @@ import sqlite3
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'base_datos', 'edgemant.db')
 
 
-def _conectar():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+def _conectar(db_path=None):
+    conn = sqlite3.connect(db_path or DB_PATH, timeout=10)
     conn.execute('PRAGMA busy_timeout = 10000')
     return conn
 
@@ -47,9 +47,9 @@ def asegurar_tabla_detecciones(conn=None):
             conn.close()
 
 
-def guardar_deteccion(deteccion):
+def guardar_deteccion(deteccion, db_path=None):
     """Guarda una detecciÃ³n una sola vez por registro de telemetrÃ­a."""
-    conn = _conectar()
+    conn = _conectar(db_path)
     try:
         asegurar_tabla_detecciones(conn)
         # Serializar la comprobaciÃ³n y la inserciÃ³n para evitar duplicados
