@@ -1,9 +1,16 @@
 import os
-import torch
-from preparar_datos import preparar
-from autoencoder import entrenar_autoencoder, calcular_error_reconstruccion
-from detectar_anomalias import calcular_umbral, detectar
-from guardar_modelo import guardar
+
+if __package__:
+    from .preparar_datos import preparar
+    from .autoencoder import entrenar_autoencoder, calcular_error_reconstruccion
+    from .detectar_anomalias import calcular_umbral, detectar
+    from .guardar_modelo import guardar
+else:
+    # Compatibilidad con ejecución directa: py .\ml\entrenar_modelo.py
+    from preparar_datos import preparar
+    from autoencoder import entrenar_autoencoder, calcular_error_reconstruccion
+    from detectar_anomalias import calcular_umbral, detectar
+    from guardar_modelo import guardar
 
 
 RUTA_MODELO = os.path.join(os.path.dirname(__file__), 'modelos')
