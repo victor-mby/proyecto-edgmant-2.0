@@ -315,3 +315,54 @@ footer {
         flex-direction: column;
     }
 }
+
+
+.apoyo-operador__resumen {
+    margin: 0.7rem 0 1rem;
+    color: #374151;
+}
+
+.apoyo-operador__alerta {
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+    border-left: 4px solid #d97706;
+    border-radius: 0.35rem;
+    padding: 0.9rem 1rem;
+    margin: 0.8rem 0 1rem;
+    color: #78350f;
+}
+
+.apoyo-operador__alerta strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.apoyo-operador__alerta--modelo {
+    background: #fff7ed;
+    border-color: #ea580c;
+    color: #9a3412;
+}
+
+.apoyo-operador__estado--validar {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+.apoyo-operador__seccion-titulo {
+    display: block;
+    margin: 1rem 0 0.45rem;
+    font-size: 0.9rem;
+    color: #1f2937;
+}
+
+.apoyo-operador__acciones {
+    padding-left: 1.35rem;
+    display: grid;
+    gap: 0.55rem;
+    color: #374151;
+}
+
+.apoyo-operador__acciones li {
+    padding-left: 0.2rem;
+}
+
