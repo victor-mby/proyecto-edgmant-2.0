@@ -113,6 +113,19 @@ function actualizarApoyoOperador(apoyo) {
 
     contenedor.append(titulo, resumen);
 
+    const deteccionesRevision = Number(apoyo.detecciones_pendientes_revision || 0);
+    if (deteccionesRevision > 0) {
+        const revision = document.createElement('div');
+        revision.className = 'apoyo-operador__alerta apoyo-operador__alerta--modelo';
+        const revisionTitulo = document.createElement('strong');
+        revisionTitulo.textContent = 'Historial conservado para revisión';
+        const revisionTexto = document.createElement('p');
+        revisionTexto.textContent = deteccionesRevision
+            + ' detecciones anteriores se conservan en la base de datos, pero no se presentan como alertas vigentes porque su motor no estaba en estado OPERATIVO. No se eliminaron las capturas de telemetría.';
+        revision.append(revisionTitulo, revisionTexto);
+        contenedor.appendChild(revision);
+    }
+
     if (apoyo.advertencia) {
         const advertencia = document.createElement('div');
         advertencia.className = modo === 'VALIDAR_MODELO'
