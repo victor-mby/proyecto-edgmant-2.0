@@ -6,6 +6,7 @@ from dashboard.servicios.servicio_historial import (
     obtener_estadisticas,
     obtener_historial,
 )
+from dashboard.servicios.servicio_apoyo_operador import construir_apoyo_operador
 from integracion.procesador_ml import (
     asegurar_tabla_evaluaciones,
     obtener_estado_ml,
@@ -42,6 +43,12 @@ def obtener_dashboard():
 
     estadisticas = obtener_estadisticas()
     estado_ml = obtener_estado_ml(DB_PATH)
+    historial = obtener_historial(50)
+    apoyo_operador = construir_apoyo_operador(
+        historial[0] if historial else None,
+        total_registros=total_registros,
+        total_detecciones=estadisticas['total'],
+    )
 
     try:
         with open(RUTA_UMBRAL, 'r', encoding='utf-8') as archivo:
@@ -59,7 +66,8 @@ def obtener_dashboard():
 
     return {
         'estadisticas': estadisticas,
-        'historial': obtener_historial(50),
+        'historial': historial,
         'motores': motores,
+        'apoyo_operador': apoyo_operador,
         'procesamiento_ml': estado_ml,
     }
