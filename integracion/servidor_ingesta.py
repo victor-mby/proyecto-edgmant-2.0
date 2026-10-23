@@ -456,6 +456,9 @@ class IngestaHandler(BaseHTTPRequestHandler):
         if self.path == "/api/salud":
             try:
                 with database_connection() as conn:
+                    from integracion.procesador_ml import preparar_evaluaciones_por_estado_operativo
+
+                    preparar_evaluaciones_por_estado_operativo(conn)
                     count = conn.execute(
                         """
                         SELECT COUNT(*)
@@ -468,6 +471,12 @@ class IngestaHandler(BaseHTTPRequestHandler):
                             "SELECT estado, COUNT(*) FROM evaluaciones_ml GROUP BY estado"
                         ).fetchall()
                     }
+                   detecciones_revision = int(
+                        conn.execute(
+                            "SELECT COUNT(*) FROM detecciones_anomalias "
+                            "WHERE estado_revision = 'PENDIENTE_REVISION'"
+                        ).fetchone()[0]
+                    )
 
                 self.send_json(
                     200,
@@ -478,8 +487,10 @@ class IngestaHandler(BaseHTTPRequestHandler):
                         "evaluaciones_ml": {
                             "pendientes": por_estado.get("PENDIENTE", 0),
                             "evaluadas": por_estado.get("EVALUADO", 0),
+                            "no_aplicables": por_estado.get("NO_APLICA", 0),
                             "errores": por_estado.get("ERROR", 0),
                         },
+                        "detecciones_pendientes_revision": detecciones_revision,
                     },
                 )
 
