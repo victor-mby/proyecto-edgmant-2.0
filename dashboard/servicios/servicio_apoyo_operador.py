@@ -16,12 +16,14 @@ def construir_apoyo_operador(
     deteccion: dict[str, Any] | None,
     total_registros: int,
     total_detecciones: int,
+    total_detecciones_revision: int = 0,
 ) -> dict[str, Any]:
     """Construye el plan que muestra el dashboard, sin alterar el modelo."""
     registros = max(0, int(total_registros))
     detecciones = max(0, int(total_detecciones))
     tasa = detecciones / registros if registros else 0.0
     tasa = min(tasa, 1.0)
+    detecciones_revision = max(0, int(total_detecciones_revision))
 
     metadatos = None
     variables: list[str] = []
@@ -58,7 +60,7 @@ def construir_apoyo_operador(
             "estado": "VALIDAR_MODELO",
             "titulo": "Validar la calibración antes de atribuir una avería",
             "resumen": (
-                f"{tasa:.1%} de los registros almacenados aparece como posible anomalía "
+                f"{tasa:.1%} de los registros evaluados por el modelo aparece como posible anomalía "
                 f"({detecciones} de {registros}). Una tasa tan alta requiere comprobar "
                 "la compatibilidad entre el modelo y la telemetría."
             ),
@@ -76,6 +78,33 @@ def construir_apoyo_operador(
             "deteccion": metadatos,
             "porcentaje_anomalias": round(tasa * 100, 2),
             "priorizar_validacion_modelo": True,
+            "detecciones_pendientes_revision": detecciones_revision,
+        }
+
+    if detecciones_revision > 0 and not deteccion:
+        return {
+            "estado": "VALIDAR_MODELO",
+            "titulo": "Revisar los resultados históricos del modelo",
+            "resumen": (
+                f"Se conservaron {detecciones_revision} detecciones anteriores para revisión. "
+                "Se asociaron a muestras cuyo motor no estaba en estado OPERATIVO, "
+                "fuera del régimen al que se aplica el modelo actual."
+            ),
+            "advertencia": (
+                "Estos resultados no se borraron, pero dejaron de mostrarse como alertas vigentes. "
+                "Sus puntuaciones históricas no deben interpretarse como averías confirmadas."
+            ),
+            "acciones": [
+                "Confirmar que el motor esté en estado OPERATIVO antes de usar la evaluación del Autoencoder.",
+                "Capturar nuevas muestras con el régimen de operación esperado y revisar sus errores de reconstrucción frente al umbral existente.",
+                "Verificar las unidades, el orden de variables y la correspondencia entre autoencoder.pth, columnas.json, scaler.json y umbral.txt; no cambiar el umbral sin validación.",
+                "Mantener las alarmas operativas del simulador como una señal separada de las detecciones del modelo.",
+            ],
+            "variables": [],
+            "deteccion": None,
+            "porcentaje_anomalias": None,
+            "priorizar_validacion_modelo": True,
+            "detecciones_pendientes_revision": detecciones_revision,
         }
 
     if not deteccion:
@@ -95,6 +124,7 @@ def construir_apoyo_operador(
             "deteccion": None,
             "porcentaje_anomalias": round(tasa * 100, 2),
             "priorizar_validacion_modelo": False,
+            "detecciones_pendientes_revision": detecciones_revision,
         }
 
     tipo = metadatos["tipo_interpretacion"].casefold()
@@ -164,6 +194,7 @@ def construir_apoyo_operador(
         "deteccion": metadatos,
         "porcentaje_anomalias": round(tasa * 100, 2),
         "priorizar_validacion_modelo": False,
+        "detecciones_pendientes_revision": detecciones_revision,
     }
 
 
