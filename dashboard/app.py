@@ -7,17 +7,21 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SERVICIOS_DIR = os.path.join(BASE_DIR, 'dashboard', 'servicios')
-ML_DIR = os.path.join(BASE_DIR, 'ml')
 
-for ruta in (SERVICIOS_DIR, ML_DIR):
-    if ruta not in sys.path:
-        sys.path.insert(0, ruta)
+# Asegura que "ml" y "dashboard" se importen como paquetes desde la raíz
+# independientemente de si se ejecuta "py dashboard/app.py" o se importa app.
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
-# Funciona tanto ejecutando el archivo directamente como importándolo
-# como módulo (por ejemplo, desde un servidor WSGI o pruebas).
 try:
-    from .servicios.dashboard import obtener_dashboard, ejecutar_inferencia_y_guardar
+    from dashboard.servicios.dashboard import (
+        obtener_dashboard,
+        ejecutar_inferencia_y_guardar,
+    )
 except ImportError:
+    # Compatibilidad si el proyecto se ejecuta con dashboard como directorio raíz.
+    if SERVICIOS_DIR not in sys.path:
+        sys.path.insert(0, SERVICIOS_DIR)
     from servicios.dashboard import obtener_dashboard, ejecutar_inferencia_y_guardar
 
 
@@ -46,5 +50,4 @@ def api_inferir():
 
 
 if __name__ == '__main__':
-    # Solo acceso local y sin depurador interactivo expuesto en la red.
     app.run(debug=False, host='127.0.0.1', port=5000)
