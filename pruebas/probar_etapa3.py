@@ -25,7 +25,7 @@ def main():
         print('OK')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('VIEW: ', end='')
     try:
@@ -34,7 +34,7 @@ def main():
         print('OK')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Modelo: ', end='')
     try:
@@ -43,7 +43,7 @@ def main():
         print('OK')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Scaler: ', end='')
     try:
@@ -54,14 +54,14 @@ def main():
         print('OK')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Umbral: ', end='')
     try:
         print(f'OK ({umbral:.6f})')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Inferencia: ', end='')
     try:
@@ -69,7 +69,7 @@ def main():
         print('OK')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Deteccion: ', end='')
     try:
@@ -77,7 +77,7 @@ def main():
         print(f'OK ({len(anomalias)} posibles anomalias)')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Interpretacion: ', end='')
     try:
@@ -90,7 +90,7 @@ def main():
         print(f'OK (ejemplos interpretados: {ejemplos})')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Historial: ', end='')
     try:
@@ -99,7 +99,7 @@ def main():
         print(f'OK (total detecciones: {stats["total"]})')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('Dashboard: ', end='')
     try:
@@ -108,7 +108,7 @@ def main():
         print('OK')
     except Exception as e:
         print('ERROR:', e)
-        return
+        raise
 
     print('----------------------------------------')
     print(f'Registros analizados: {len(df_resultado)}')

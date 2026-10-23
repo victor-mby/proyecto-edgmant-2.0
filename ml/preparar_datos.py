@@ -1,7 +1,8 @@
-import sqlite3
 import os
-import pandas as pd
+import sqlite3
+
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 
@@ -32,53 +33,95 @@ VARIABLES_ML = [
 def cargar_datos():
     if not os.path.exists(RUTA_DB):
         raise FileNotFoundError(f'Base de datos no encontrada: {RUTA_DB}')
-    conn = sqlite3.connect(RUTA_DB)
-    df = pd.read_sql_query('SELECT * FROM vista_telemetria_ml', conn)
-    conn.close()
+
+    with sqlite3.connect(RUTA_DB) as conn:
+        df = pd.read_sql_query('SELECT * FROM vista_telemetria_ml', conn)
+    if df.empty:
+        raise ValueError('La vista vista_telemetria_ml no contiene registros para preparar.')
     return df
 
 
 def seleccionar_variables(df):
-    df = df.copy()
-    disponibles = [c for c in VARIABLES_ML if c in df.columns]
-    faltantes = [c for c in VARIABLES_ML if c not in df.columns]
+    faltantes = [columna for columna in VARIABLES_ML if columna not in df.columns]
     if faltantes:
-        print(f'Advertencia: variables no disponibles en la VIEW: {faltantes}')
-    if not disponibles:
-        raise ValueError('No hay variables numericas disponibles para el modelo.')
-    df = df[disponibles].copy()
-    return df, disponibles
+        raise ValueError(
+            'La vista de telemetría no contiene las columnas esperadas por el modelo: '
+            + ', '.join(faltantes)
+        )
+
+    datos = df.loc[:, VARIABLES_ML].copy()
+    for columna in VARIABLES_ML:
+        datos[columna] = pd.to_numeric(datos[columna], errors='coerce')
+    datos = datos.replace([np.inf, -np.inf], np.nan)
+
+    # Los CSV del simulador no incluyen todas las variables de telemetría.
+    # Excluir solo columnas sin ningún dato real evita descartar todo el lote
+    # o inventar valores; las columnas elegidas quedan guardadas con el modelo.
+    disponibles = [columna for columna in VARIABLES_ML if datos[columna].notna().any()]
+    ausentes = [columna for columna in VARIABLES_ML if columna not in disponibles]
+    if len(disponibles) < 3:
+        raise ValueError(
+            'Se necesitan al menos 3 variables de telemetría con datos numéricos '
+            'para entrenar un modelo multivariable; se encontraron '
+            f'{len(disponibles)}.'
+        )
+    if ausentes:
+        print(
+            'Variables sin datos en esta fuente (no se usarán en este entrenamiento): '
+            + ', '.join(ausentes)
+        )
+
+    return datos.loc[:, disponibles].copy(), disponibles
 
 
 def limpiar_datos(df):
-    df = df.copy()
-    df = df.replace([np.inf, -np.inf], np.nan)
-    nulos_antes = df.isnull().sum().sum()
-    df = df.dropna()
-    nulos_despues = df.isnull().sum().sum()
-    if nulos_antes > 0:
-        print(f'Registros con valores nulos eliminados: {nulos_antes}')
-    return df
+    datos = df.replace([np.inf, -np.inf], np.nan)
+    filas_antes = len(datos)
+    datos = datos.dropna(axis=0, how='any')
+    descartados = filas_antes - len(datos)
+    if descartados:
+        print(
+            f'Registros incompletos o no numéricos descartados: {descartados} '
+            f'de {filas_antes}. No se sustituyeron los valores ausentes por cero.'
+        )
+    if datos.empty:
+        raise ValueError(
+            'No quedan registros completos para entrenar con las variables disponibles. '
+            'Revisa la calidad de la telemetría importada.'
+        )
+    return datos
 
 
 def normalizar(df):
     scaler = StandardScaler()
     X = scaler.fit_transform(df.values)
+    if not np.isfinite(X).all():
+        raise ValueError('La normalización produjo valores no finitos; revisa los datos de entrada.')
     return X, scaler, df.columns.tolist()
 
 
 def preparar():
-    df_raw = cargar_datos()
-    print(f'Registros cargados desde VIEW: {len(df_raw)}')
-    df_vars, columnas = seleccionar_variables(df_raw)
+    df_raw_completo = cargar_datos()
+    print(f'Registros leídos desde VIEW: {len(df_raw_completo)}')
+    df_vars, columnas = seleccionar_variables(df_raw_completo)
     df_clean = limpiar_datos(df_vars)
     X, scaler, nombres = normalizar(df_clean)
+
+    # Alinear las filas originales con X para que cada error de reconstrucción
+    # corresponda al registro correcto, incluso cuando se descartaron filas.
+    df_raw_alineado = df_raw_completo.loc[df_clean.index].copy()
     print(f'Variables utilizadas: {nombres}')
     print(f'Datos preparados: {X.shape[0]} registros, {X.shape[1]} variables')
+
     return {
-        'df_raw': df_raw,
+        'df_raw': df_raw_alineado,
+        'df_raw_completo': df_raw_completo,
         'df_clean': df_clean,
         'X': X,
         'scaler': scaler,
         'columnas': nombres,
     }
+
+
+if __name__ == '__main__':
+    preparar()

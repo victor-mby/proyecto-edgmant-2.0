@@ -290,11 +290,11 @@ export function crearDiagrama(contenedor, sim) {
     const mitad = t.t.x + t.t.ancho / 2;
     t.agua.setAttribute(
       'd',
-      `M ${x0} ${t.t.abajo} L ${x0} ${ySuperficie} Q ${t.x + t.t.ancho * 0.25} ${ySuperficie + Math.sin(fase) * amplitud} ${mitad} ${ySuperficie} Q ${t.x + t.t.ancho * 0.75} ${ySuperficie - Math.sin(fase) * amplitud} ${x1} ${ySuperficie} L ${x1} ${t.t.abajo} Z`,
+      `M ${x0} ${t.t.abajo} L ${x0} ${ySuperficie} Q ${t.t.x + t.t.ancho * 0.25} ${ySuperficie + Math.sin(fase) * amplitud} ${mitad} ${ySuperficie} Q ${t.t.x + t.t.ancho * 0.75} ${ySuperficie - Math.sin(fase) * amplitud} ${x1} ${ySuperficie} L ${x1} ${t.t.abajo} Z`,
     );
     t.ola.setAttribute(
       'd',
-      `M ${x0} ${ySuperficie} Q ${t.x + t.t.ancho * 0.25} ${ySuperficie + Math.sin(fase) * amplitud} ${mitad} ${ySuperficie} Q ${t.x + t.t.ancho * 0.75} ${ySuperficie - Math.sin(fase) * amplitud} ${x1} ${ySuperficie}`,
+      `M ${x0} ${ySuperficie} Q ${t.t.x + t.t.ancho * 0.25} ${ySuperficie + Math.sin(fase) * amplitud} ${mitad} ${ySuperficie} Q ${t.t.x + t.t.ancho * 0.75} ${ySuperficie - Math.sin(fase) * amplitud} ${x1} ${ySuperficie}`,
     );
     t.lectura.textContent = `${numero(estado.tanque.nivel, 2)} m`;
     t.porcentajeTexto.textContent = porcentaje(nivelRel, 0);
