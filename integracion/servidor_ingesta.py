@@ -471,7 +471,7 @@ class IngestaHandler(BaseHTTPRequestHandler):
                             "SELECT estado, COUNT(*) FROM evaluaciones_ml GROUP BY estado"
                         ).fetchall()
                     }
-                   detecciones_revision = int(
+                    detecciones_revision = int(
                         conn.execute(
                             "SELECT COUNT(*) FROM detecciones_anomalias "
                             "WHERE estado_revision = 'PENDIENTE_REVISION'"
