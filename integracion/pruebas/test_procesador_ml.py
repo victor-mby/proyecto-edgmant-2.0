@@ -61,9 +61,49 @@ class TestProcesadorML(unittest.TestCase):
             },
         )
 
+    def test_motor_parado_pendiente_no_carga_el_modelo(self):
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute(
+                "INSERT INTO estaciones (id, nombre) VALUES ('EB-01', 'Estación de prueba')"
+            )
+            conn.execute(
+                "INSERT INTO motores (id, estacion_id, descripcion) VALUES ('M-01', 'EB-01', 'Bomba')"
+            )
+            cursor = conn.execute("""
+                INSERT INTO registros_telemetria (
+                    tiempo, timestamp, motor_id, nivel, nivel_porcentaje, voltaje,
+                    amperaje, caudal, potencia, estado_motor, estado_valvula,
+                    caudal_total, potencia_total, nivel_destino, demanda
+                ) VALUES (1, 1000, 'M-01', 4.2, 52.5, 220, 0.1, 0, 0,
+                          'PARADO', 'CERRADA', 0, 0, 3.4, 35)
+            """)
+            conn.execute(
+                "INSERT INTO evaluaciones_ml (registro_id, estado) VALUES (?, 'PENDIENTE')",
+                (int(cursor.lastrowid),),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        resultado = procesador_ml.procesar_pendientes(db_path=self.db_path)
+
+        self.assertEqual(resultado["evaluados"], 0)
+        self.assertEqual(resultado["no_aplican"], 1)
+        self.assertEqual(resultado["pendientes"], 0)
+        conn = sqlite3.connect(self.db_path)
+        try:
+            estado = conn.execute(
+                "SELECT estado, anomalia FROM evaluaciones_ml"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(estado, ("NO_APLICA", None))
+
     def test_motor_parado_pasa_a_no_aplica_y_conserva_el_historial(self):
-        # Simula el esquema anterior para comprobar que la migración conserva los registros.
-        with sqlite3.connect(self.db_path) as conn:
+        # Recrea la estructura antigua de la cola para verificar la migración.
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.execute("DROP TABLE evaluaciones_ml")
             conn.execute("""
                 CREATE TABLE evaluaciones_ml (
@@ -100,6 +140,9 @@ class TestProcesadorML(unittest.TestCase):
                     modelo_version, detalle_error
                 ) VALUES (?, 'EVALUADO', 608.9, 0.366954, 1, 'anterior', NULL)
             """, (registro_id,))
+            conn.commit()
+        finally:
+            conn.close()
 
         from dashboard.servicios.servicio_historial import guardar_deteccion
 
