@@ -64,6 +64,7 @@ export function crearSimulador(configInicial) {
   function capturar(dt) {
     const estado = estacion.estado;
     const fecha = estacion.fechaSimulacion();
+    const registrosCapturados = [];
     for (const motor of estado.motores) {
       const registro = {
         tiempo: estado.tiempo,
@@ -99,8 +100,10 @@ export function crearSimulador(configInicial) {
         nivel_tanque_maximo: estado.tanque.altura,
       };
       historial.agregar(registro);
+      registrosCapturados.push(registro);
     }
     reloj.muestras += 1;
+    bus.emit('captura', registrosCapturados);
     bus.emit('muestra', { dt, total: historial.total() });
   }
 
