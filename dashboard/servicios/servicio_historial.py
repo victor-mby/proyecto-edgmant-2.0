@@ -46,11 +46,11 @@ def asegurar_tabla_detecciones(conn=None):
             fila[1] for fila in conn.execute('PRAGMA table_info(detecciones_anomalias)')
         }
         if 'estado_revision' not in columnas:
-            conn.execute(\"\"\"
+            conn.execute("""
                 ALTER TABLE detecciones_anomalias
                 ADD COLUMN estado_revision TEXT NOT NULL DEFAULT 'VIGENTE'
                     CHECK (estado_revision IN ('VIGENTE', 'PENDIENTE_REVISION'))
-            \"\"\")
+            """)
         conn.execute('''
             CREATE INDEX IF NOT EXISTS idx_detecciones_estado_revision
             ON detecciones_anomalias(estado_revision, tiempo)
@@ -63,8 +63,8 @@ def asegurar_tabla_detecciones(conn=None):
 
 
 def marcar_detecciones_no_vigentes_por_estado_motor(conn):
-    \"\"\"Aparta detecciones de motores fuera del régimen OPERATIVO sin borrarlas.\"\"\"
-    cursor = conn.execute(\"\"\"
+    """Aparta detecciones de motores fuera del régimen OPERATIVO sin borrarlas."""
+    cursor = conn.execute("""
         UPDATE detecciones_anomalias
         SET estado_revision = 'PENDIENTE_REVISION'
         WHERE estado_revision = 'VIGENTE'
@@ -73,7 +73,7 @@ def marcar_detecciones_no_vigentes_por_estado_motor(conn):
               FROM registros_telemetria
               WHERE UPPER(TRIM(COALESCE(estado_motor, ''))) <> 'OPERATIVO'
           )
-    \"\"\")
+    """)
     return cursor.rowcount
 
 
@@ -169,13 +169,13 @@ def obtener_estadisticas():
         asegurar_tabla_detecciones(conn)
         conn.commit()
         total = conn.execute(
-            \"SELECT COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'VIGENTE'\"
+            "SELECT COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'VIGENTE'"
         ).fetchone()[0]
         filas = conn.execute(
-            \"SELECT severidad, COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'VIGENTE' GROUP BY severidad\"
+            "SELECT severidad, COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'VIGENTE' GROUP BY severidad"
         ).fetchall()
         pendientes_revision = conn.execute(
-            \"SELECT COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'PENDIENTE_REVISION'\"
+            "SELECT COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'PENDIENTE_REVISION'"
         ).fetchone()[0]
     finally:
         conn.close()
