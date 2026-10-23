@@ -195,3 +195,123 @@ footer {
     font-size: 0.8rem;
     color: #6b7280;
 }
+
+
+.apoyo-operador {
+    background: #fff;
+    border: 1px solid #dbe3ee;
+    border-radius: 0.65rem;
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.apoyo-operador__encabezado {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.apoyo-operador__encabezado h2 {
+    margin-bottom: 0.25rem;
+}
+
+.apoyo-operador__encabezado p,
+.apoyo-operador__nota {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.apoyo-operador__estado {
+    flex-shrink: 0;
+    display: inline-block;
+    border-radius: 9999px;
+    padding: 0.3rem 0.65rem;
+    background: #eef2f7;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.apoyo-operador__estado--atencion {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.apoyo-operador__estado--critico {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.apoyo-operador__contenido {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 1rem;
+}
+
+.apoyo-operador__titulo {
+    color: #111827;
+    font-size: 1.05rem;
+    margin-bottom: 0.45rem;
+}
+
+.apoyo-operador__metadatos {
+    color: #6b7280;
+    font-size: 0.85rem;
+    margin-bottom: 0.85rem;
+}
+
+.apoyo-operador__recomendacion {
+    background: #f8fafc;
+    border-left: 4px solid #64748b;
+    border-radius: 0.25rem;
+    padding: 0.85rem 1rem;
+    margin: 0.6rem 0 0.9rem;
+}
+
+.apoyo-operador__recomendacion strong {
+    display: block;
+    color: #374151;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.25rem;
+}
+
+.apoyo-operador__recomendacion p {
+    color: #1f2937;
+}
+
+.apoyo-operador__variables {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+}
+
+.apoyo-operador__variable {
+    display: inline-block;
+    background: #eef2ff;
+    color: #3730a3;
+    border-radius: 0.3rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.apoyo-operador__vacio {
+    color: #6b7280;
+    font-size: 0.92rem;
+    padding: 0.25rem 0;
+}
+
+.apoyo-operador__nota {
+    border-top: 1px solid #e5e7eb;
+    margin-top: 1rem;
+    padding-top: 0.8rem;
+}
+
+@media (max-width: 640px) {
+    .apoyo-operador__encabezado {
+        flex-direction: column;
+    }
+}
