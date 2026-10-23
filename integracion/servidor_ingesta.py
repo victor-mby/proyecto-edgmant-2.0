@@ -1,7 +1,7 @@
 """Receptor local de telemetría para EdgeMant.
 
-Solo escucha en loopback y acepta solicitudes desde el simulador local.
-Utiliza únicamente la biblioteca estándar de Python.
+Valida y guarda las capturas usando la biblioteca estándar. Tras confirmar
+la escritura, puede invocar de forma diferida al procesador ML de EdgeMant.
 """
 
 from __future__ import annotations
