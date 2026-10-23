@@ -1,62 +1,36 @@
 import os
 import sqlite3
-import sys
+
+from dashboard.servicios.servicio_historial import (
+    asegurar_tabla_detecciones,
+    obtener_estadisticas,
+    obtener_historial,
+)
+from integracion.procesador_ml import (
+    asegurar_tabla_evaluaciones,
+    obtener_estado_ml,
+    procesar_pendientes,
+)
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-ML_DIR = os.path.join(BASE_DIR, 'ml')
 DB_PATH = os.path.join(BASE_DIR, 'base_datos', 'edgemant.db')
-RUTA_UMBRAL = os.path.join(ML_DIR, 'modelos', 'umbral.txt')
-
-if ML_DIR not in sys.path:
-    sys.path.insert(0, ML_DIR)
-
-from inferir import inferir, cargar_modelo
-from interpretar import interpretar_fila
-from servicio_historial import (
-    guardar_deteccion,
-    obtener_historial,
-    obtener_estadisticas,
-    asegurar_tabla_detecciones,
-)
+RUTA_UMBRAL = os.path.join(BASE_DIR, 'ml', 'modelos', 'umbral.txt')
 
 
 def ejecutar_inferencia_y_guardar():
-    df_resultado, _ = inferir()
-    _, scaler, columnas, umbral = cargar_modelo()
-    guardados = 0
-
-    for _, fila in df_resultado.iterrows():
-        if int(fila['anomalia']) != 1:
-            continue
-
-        interpretacion = interpretar_fila(fila, columnas, scaler, umbral)
-        deteccion = {
-            'id': int(fila['id']),
-            'motor_id': str(fila.get('motor_id', '')),
-            'tiempo': float(fila['tiempo']),
-            'fecha': str(fila.get('fecha', '') or ''),
-            'hora': str(fila.get('hora', '') or ''),
-            'error_reconstruccion': float(fila['error_reconstruccion']),
-            'umbral': float(umbral),
-            'severidad': interpretacion['severidad'],
-            'tipo_interpretacion': interpretacion['tipo_interpretacion'],
-            'descripcion': interpretacion['descripcion'],
-            'variables_relevantes': interpretacion['variables_relevantes'],
-        }
-        if guardar_deteccion(deteccion):
-            guardados += 1
-
-    return guardados
+    """Evalúa únicamente capturas pendientes; no vuelve a recorrer todo el histórico."""
+    resumen = procesar_pendientes(db_path=DB_PATH)
+    return int(resumen['detecciones_guardadas'])
 
 
 def obtener_dashboard():
     if not os.path.isfile(DB_PATH):
         raise FileNotFoundError(f'No se encontró la base de datos: {DB_PATH}')
 
-    asegurar_tabla_detecciones()
-    estadisticas = obtener_estadisticas()
-
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+        conn.execute('PRAGMA busy_timeout = 10000')
+        asegurar_tabla_evaluaciones(conn)
+        asegurar_tabla_detecciones(conn)
         total_registros = conn.execute(
             'SELECT COUNT(*) FROM registros_telemetria'
         ).fetchone()[0]
@@ -65,6 +39,9 @@ def obtener_dashboard():
                 'SELECT DISTINCT motor_id FROM registros_telemetria ORDER BY motor_id'
             ).fetchall()
         ]
+
+    estadisticas = obtener_estadisticas()
+    estado_ml = obtener_estado_ml(DB_PATH)
 
     try:
         with open(RUTA_UMBRAL, 'r', encoding='utf-8') as archivo:
@@ -76,10 +53,13 @@ def obtener_dashboard():
         'total_registros': int(total_registros),
         'total_detecciones': int(estadisticas['total']),
         'umbral': umbral,
+        'registros_evaluados_ml': estado_ml['evaluados'],
+        'registros_pendientes_ml': estado_ml['pendientes'],
     })
 
     return {
         'estadisticas': estadisticas,
         'historial': obtener_historial(50),
         'motores': motores,
+        'procesamiento_ml': estado_ml,
     }
