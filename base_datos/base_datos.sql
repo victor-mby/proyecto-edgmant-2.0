@@ -103,7 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_eventos_tipo ON eventos(tipo);
 CREATE TABLE IF NOT EXISTS evaluaciones_ml (
     registro_id INTEGER PRIMARY KEY,
     estado TEXT NOT NULL DEFAULT 'PENDIENTE'
-        CHECK (estado IN ('PENDIENTE', 'EVALUADO', 'ERROR')),
+        CHECK (estado IN ('PENDIENTE', 'EVALUADO', 'ERROR', 'NO_APLICA')),
     error_reconstruccion REAL,
     umbral REAL,
     anomalia INTEGER CHECK (anomalia IS NULL OR anomalia IN (0, 1)),
