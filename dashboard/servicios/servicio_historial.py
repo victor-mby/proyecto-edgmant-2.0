@@ -29,7 +29,9 @@ def asegurar_tabla_detecciones(conn=None):
                 severidad TEXT NOT NULL,
                 tipo_interpretacion TEXT NOT NULL,
                 descripcion TEXT NOT NULL,
-                variables_relevantes TEXT NOT NULL
+                variables_relevantes TEXT NOT NULL,
+                estado_revision TEXT NOT NULL DEFAULT 'VIGENTE'
+                    CHECK (estado_revision IN ('VIGENTE', 'PENDIENTE_REVISION'))
             )
         ''')
         conn.execute('''
@@ -40,11 +42,39 @@ def asegurar_tabla_detecciones(conn=None):
             CREATE INDEX IF NOT EXISTS idx_detecciones_tiempo
             ON detecciones_anomalias(tiempo)
         ''')
+        columnas = {
+            fila[1] for fila in conn.execute('PRAGMA table_info(detecciones_anomalias)')
+        }
+        if 'estado_revision' not in columnas:
+            conn.execute(\"\"\"
+                ALTER TABLE detecciones_anomalias
+                ADD COLUMN estado_revision TEXT NOT NULL DEFAULT 'VIGENTE'
+                    CHECK (estado_revision IN ('VIGENTE', 'PENDIENTE_REVISION'))
+            \"\"\")
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_detecciones_estado_revision
+            ON detecciones_anomalias(estado_revision, tiempo)
+        ''')
         if propia:
             conn.commit()
     finally:
         if propia:
             conn.close()
+
+
+def marcar_detecciones_no_vigentes_por_estado_motor(conn):
+    \"\"\"Aparta detecciones de motores fuera del régimen OPERATIVO sin borrarlas.\"\"\"
+    cursor = conn.execute(\"\"\"
+        UPDATE detecciones_anomalias
+        SET estado_revision = 'PENDIENTE_REVISION'
+        WHERE estado_revision = 'VIGENTE'
+          AND registro_id IN (
+              SELECT id
+              FROM registros_telemetria
+              WHERE UPPER(TRIM(COALESCE(estado_motor, ''))) <> 'OPERATIVO'
+          )
+    \"\"\")
+    return cursor.rowcount
 
 
 def guardar_deteccion(deteccion, db_path=None):
@@ -97,11 +127,13 @@ def obtener_historial(limit=100):
     conn = _conectar()
     try:
         asegurar_tabla_detecciones(conn)
+        conn.commit()
         filas = conn.execute('''
             SELECT id, registro_id, motor_id, tiempo, fecha, hora,
                    error_reconstruccion, umbral, severidad,
                    tipo_interpretacion, descripcion, variables_relevantes
             FROM detecciones_anomalias
+            WHERE estado_revision = 'VIGENTE'
             ORDER BY tiempo DESC, id DESC
             LIMIT ?
         ''', (max(0, int(limit)),)).fetchall()
@@ -135,13 +167,21 @@ def obtener_estadisticas():
     conn = _conectar()
     try:
         asegurar_tabla_detecciones(conn)
+        conn.commit()
         total = conn.execute(
-            'SELECT COUNT(*) FROM detecciones_anomalias'
+            \"SELECT COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'VIGENTE'\"
         ).fetchone()[0]
         filas = conn.execute(
-            'SELECT severidad, COUNT(*) FROM detecciones_anomalias GROUP BY severidad'
+            \"SELECT severidad, COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'VIGENTE' GROUP BY severidad\"
         ).fetchall()
+        pendientes_revision = conn.execute(
+            \"SELECT COUNT(*) FROM detecciones_anomalias WHERE estado_revision = 'PENDIENTE_REVISION'\"
+        ).fetchone()[0]
     finally:
         conn.close()
-    return {'total': total, 'por_severidad': {fila[0]: fila[1] for fila in filas}}
+    return {
+        'total': total,
+        'por_severidad': {fila[0]: fila[1] for fila in filas},
+        'pendientes_revision': int(pendientes_revision),
+    }
 
