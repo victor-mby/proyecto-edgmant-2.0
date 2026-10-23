@@ -52,13 +52,26 @@ class TestIngesta(unittest.TestCase):
         proyecto_dir = Path(__file__).resolve().parents[2]
         base_datos_dir = proyecto_dir / "base_datos"
 
+        self.configuracion_original = (
+            ingesta.DB_PATH,
+            ingesta.SCHEMA_PATH,
+            ingesta.VIEW_PATH,
+            ingesta.AUTO_PROCESAR_ML,
+        )
         ingesta.DB_PATH = root / "edgemant.db"
         ingesta.SCHEMA_PATH = base_datos_dir / "base_datos.sql"
         ingesta.VIEW_PATH = base_datos_dir / "view_ml.sql"
+        ingesta.AUTO_PROCESAR_ML = False
 
         ingesta.initialize_db()
 
     def tearDown(self):
+        (
+            ingesta.DB_PATH,
+            ingesta.SCHEMA_PATH,
+            ingesta.VIEW_PATH,
+            ingesta.AUTO_PROCESAR_ML,
+        ) = self.configuracion_original
         self.tempdir.cleanup()
 
     def test_inserta_29_campos(self):
@@ -84,6 +97,13 @@ class TestIngesta(unittest.TestCase):
             self.assertEqual(row["factor_potencia"], 0.91)
             self.assertEqual(row["horas_operacion"], 120.0)
 
+            evaluacion = conn.execute(
+                "SELECT estado FROM evaluaciones_ml WHERE registro_id = ?",
+                (row["id"],),
+            ).fetchone()
+            self.assertIsNotNone(evaluacion)
+            self.assertEqual(evaluacion["estado"], "PENDIENTE")
+
     def test_reintento_no_duplica(self):
         record = muestra()
 
@@ -100,6 +120,11 @@ class TestIngesta(unittest.TestCase):
             ).fetchone()[0]
 
             self.assertEqual(count, 1)
+
+            evaluaciones = conn.execute(
+                "SELECT COUNT(*) FROM evaluaciones_ml"
+            ).fetchone()[0]
+            self.assertEqual(evaluaciones, 1)
 
     def test_rechaza_campos_faltantes(self):
         bad = muestra()

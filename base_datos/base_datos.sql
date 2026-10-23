@@ -97,3 +97,20 @@ CREATE INDEX IF NOT EXISTS idx_telemetria_motor_tiempo ON registros_telemetria(m
 CREATE INDEX IF NOT EXISTS idx_telemetria_tiempo ON registros_telemetria(tiempo);
 CREATE INDEX IF NOT EXISTS idx_eventos_tiempo ON eventos(tiempo);
 CREATE INDEX IF NOT EXISTS idx_eventos_tipo ON eventos(tipo);
+
+
+-- Cola y resultado de evaluación de EdgeMant. Solo se encolan nuevas capturas.
+CREATE TABLE IF NOT EXISTS evaluaciones_ml (
+    registro_id INTEGER PRIMARY KEY,
+    estado TEXT NOT NULL DEFAULT 'PENDIENTE'
+        CHECK (estado IN ('PENDIENTE', 'EVALUADO', 'ERROR', 'NO_APLICA')),
+    error_reconstruccion REAL,
+    umbral REAL,
+    anomalia INTEGER CHECK (anomalia IS NULL OR anomalia IN (0, 1)),
+    modelo_version TEXT,
+    evaluado_en TEXT,
+    detalle_error TEXT,
+    FOREIGN KEY (registro_id) REFERENCES registros_telemetria(id)
+);
+CREATE INDEX IF NOT EXISTS idx_evaluaciones_estado
+    ON evaluaciones_ml(estado, registro_id);
