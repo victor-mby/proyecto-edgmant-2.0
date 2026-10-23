@@ -83,17 +83,28 @@ def cargar_modelo():
     return modelo, scaler, columnas, umbral
 
 
-def leer_view():
-    if not os.path.isfile(RUTA_DB):
+def leer_view(registro_ids=None, db_path=RUTA_DB):
+    """Lee toda la vista o únicamente los IDs capturados que se deben evaluar."""
+    if not os.path.isfile(db_path):
         raise FileNotFoundError(
-            f'No se encontró la base de datos: {RUTA_DB}. '
-            'Ejecuta primero base_datos/crear_base_datos.py.'
+            f'No se encontró la base de datos: {db_path}. '
+            'Ejecuta primero el receptor de EdgeMant.'
         )
 
-    with sqlite3.connect(RUTA_DB) as conn:
-        df = pd.read_sql_query('SELECT * FROM vista_telemetria_ml', conn)
-    return df
+    consulta = 'SELECT * FROM vista_telemetria_ml'
+    parametros = []
+    if registro_ids is not None:
+        ids = list(dict.fromkeys(int(valor) for valor in registro_ids))
+        if not ids:
+            return pd.DataFrame()
+        consulta += ' WHERE id IN (' + ', '.join('?' for _ in ids) + ')'
+        parametros.extend(ids)
+        consulta += ' ORDER BY id'
 
+    with sqlite3.connect(db_path, timeout=10) as conn:
+        conn.execute('PRAGMA busy_timeout = 10000')
+        df = pd.read_sql_query(consulta, conn, params=parametros)
+    return df
 
 def preparar_datos(df, columnas):
     if df.empty:
@@ -126,16 +137,25 @@ def normalizar(df, scaler):
     return scaler.transform(df.values)
 
 
-def inferir():
-    modelo, scaler, columnas, umbral = cargar_modelo()
-    df_raw = leer_view()
+def inferir(registro_ids=None, db_path=RUTA_DB, modelo_cargado=None):
+    """Evalúa la telemetría guardada; opcionalmente limita la evaluación a IDs nuevos."""
+    bundle = modelo_cargado if modelo_cargado is not None else cargar_modelo()
+    modelo, scaler, columnas, umbral = bundle
+    df_raw = leer_view(registro_ids=registro_ids, db_path=db_path)
+
+    if df_raw.empty:
+        columnas_salida = list(COLUMNAS_IDENTIFICACION) + list(columnas) + [
+            'error_reconstruccion', 'umbral', 'anomalia'
+        ]
+        return pd.DataFrame(columns=list(dict.fromkeys(columnas_salida))), df_raw
+
     df_clean = preparar_datos(df_raw, columnas)
-    X = normalizar(df_clean, scaler)
+    X = scaler.transform(df_clean.to_numpy(dtype=float))
+    if not np.isfinite(X).all():
+        raise ValueError('La normalización produjo valores no finitos.')
+
     errores, _ = calcular_error_reconstruccion(modelo, X)
 
-    # Conservar metadatos y variables de sensores: el diagnóstico necesita
-    # los valores originales para explicar qué variables se desviaron.
-    indices_validos = df_clean.index
     columnas_identificacion = [
         columna for columna in COLUMNAS_IDENTIFICACION if columna in df_raw.columns
     ]
@@ -149,12 +169,11 @@ def inferir():
             + ', '.join(faltantes_identificacion)
         )
 
-    # Usar los valores numéricos ya validados, no posibles cadenas originales
-    # que SQLite podría devolver por su tipado dinámico.
+    # Los índices conservados por preparar_datos alinean cada error con su muestra.
+    indices_validos = df_clean.index
     df_resultado = df_raw.loc[indices_validos, columnas_identificacion].copy()
     df_resultado = df_resultado.join(df_clean, how='left').reset_index(drop=True)
     df_resultado['error_reconstruccion'] = errores
     df_resultado['umbral'] = umbral
     df_resultado['anomalia'] = (df_resultado['error_reconstruccion'] > umbral).astype(int)
-
     return df_resultado, df_raw
