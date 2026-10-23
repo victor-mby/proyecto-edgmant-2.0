@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,7 +18,10 @@ from typing import Any
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT_DIR / "base_datos" / "edgemant.db"
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+DB_PATH = ROOT_DIR / "base_datos" / "edgemant.db
 SCHEMA_PATH = ROOT_DIR / "base_datos" / "base_datos.sql"
 VIEW_PATH = ROOT_DIR / "base_datos" / "view_ml.sql"
 
@@ -33,6 +37,7 @@ ALLOWED_ORIGINS = {
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
 MAX_BATCH_SIZE = 500
+AUTO_PROCESAR_ML = os.environ.get("EDGEMANT_AUTO_INFERENCIA", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
 NUMERIC_FIELDS = (
@@ -207,6 +212,7 @@ def insert_batch(items: list[Any]) -> dict[str, int]:
 
     inserted = 0
     skipped = 0
+    registros_insertados: list[int] = []
 
     received_at = datetime.now(timezone.utc).isoformat()
 
@@ -325,6 +331,16 @@ def insert_batch(items: list[Any]) -> dict[str, int]:
                 record,
             )
 
+            registro_id = int(cursor.lastrowid)
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO evaluaciones_ml (registro_id, estado)
+                VALUES (?, 'PENDIENTE')
+                """,
+                (registro_id,),
+            )
+            registros_insertados.append(registro_id)
+
             conn.execute(
                 """
                 INSERT INTO ingestas_simulador
@@ -333,12 +349,29 @@ def insert_batch(items: list[Any]) -> dict[str, int]:
                 """,
                 (
                     key,
-                    cursor.lastrowid,
+                    registro_id,
                     received_at,
                 ),
             )
 
             inserted += 1
+
+    if registros_insertados and AUTO_PROCESAR_ML:
+        try:
+            from integracion.procesador_ml import procesar_pendientes
+
+            resumen = procesar_pendientes(db_path=DB_PATH, limit=MAX_BATCH_SIZE)
+            print(
+                "[EdgeMant ML] Evaluados: {evaluados}; normales: {normales}; "
+                "anomalías: {anomalias}; detecciones nuevas: {detecciones_guardadas}; "
+                "pendientes: {pendientes}".format(**resumen)
+            )
+        except Exception as exc:
+            # La captura permanece guardada en la cola si el modelo falla o falta.
+            print(
+                "[EdgeMant ML] La telemetría quedó guardada; la evaluación "
+                f"permanece pendiente: {exc}"
+            )
 
     return {
         "recibidos": len(items),
@@ -429,6 +462,12 @@ class IngestaHandler(BaseHTTPRequestHandler):
                         FROM ingestas_simulador
                         """
                     ).fetchone()[0]
+                    por_estado = {
+                        fila[0]: int(fila[1])
+                        for fila in conn.execute(
+                            "SELECT estado, COUNT(*) FROM evaluaciones_ml GROUP BY estado"
+                        ).fetchall()
+                    }
 
                 self.send_json(
                     200,
@@ -436,6 +475,11 @@ class IngestaHandler(BaseHTTPRequestHandler):
                         "ok": True,
                         "servicio": "EdgeMant",
                         "muestras_ingestadas": count,
+                        "evaluaciones_ml": {
+                            "pendientes": por_estado.get("PENDIENTE", 0),
+                            "evaluadas": por_estado.get("EVALUADO", 0),
+                            "errores": por_estado.get("ERROR", 0),
+                        },
                     },
                 )
 
