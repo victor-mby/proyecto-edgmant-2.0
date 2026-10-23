@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,17 @@ def _conectar(db_path: str | Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 10000")
     return conn
+
+
+@contextmanager
+def _sesion(db_path: str | Path | None = None):
+    """Garantiza cierre de conexión y commit/rollback en cada operación."""
+    conn = _conectar(db_path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def asegurar_tabla_evaluaciones(conn: sqlite3.Connection) -> None:
@@ -70,7 +82,7 @@ def procesar_pendientes(
 
     ruta_db = Path(db_path) if db_path is not None else DB_PATH
 
-    with _conectar(ruta_db) as conn:
+    with _sesion(ruta_db) as conn
         asegurar_tabla_evaluaciones(conn)
         from dashboard.servicios.servicio_historial import asegurar_tabla_detecciones
 
@@ -146,7 +158,7 @@ def procesar_pendientes(
         else:
             normales += 1
 
-        with _conectar(ruta_db) as conn:
+        with _sesion(ruta_db) as conn
             conn.execute(
                 """
                 UPDATE evaluaciones_ml
@@ -173,7 +185,7 @@ def procesar_pendientes(
     # se deja identificada como error en vez de volver a procesarla infinitamente.
     omitidos = set(ids) - ids_evaluados
     for registro_id in omitidos:
-        with _conectar(ruta_db) as conn:
+        with _sesion(ruta_db) as conn
             conn.execute(
                 """
                 UPDATE evaluaciones_ml
@@ -202,7 +214,7 @@ def procesar_pendientes(
 def obtener_estado_ml(db_path: str | Path | None = None) -> dict[str, int]:
     """Devuelve contadores de cola sin ejecutar inferencia ni modificar muestras."""
     ruta_db = Path(db_path) if db_path is not None else DB_PATH
-    with _conectar(ruta_db) as conn:
+    with _sesion(ruta_db) as conn
         asegurar_tabla_evaluaciones(conn)
         from dashboard.servicios.servicio_historial import asegurar_tabla_detecciones
 
