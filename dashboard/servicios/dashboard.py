@@ -1,18 +1,14 @@
 import os
 import sqlite3
-import sys
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-ML_DIR = os.path.join(BASE_DIR, 'ml')
 DB_PATH = os.path.join(BASE_DIR, 'base_datos', 'edgemant.db')
-RUTA_UMBRAL = os.path.join(ML_DIR, 'modelos', 'umbral.txt')
+RUTA_UMBRAL = os.path.join(BASE_DIR, 'ml', 'modelos', 'umbral.txt')
 
-if ML_DIR not in sys.path:
-    sys.path.insert(0, ML_DIR)
-
-from inferir import inferir, cargar_modelo
-from interpretar import interpretar_fila
-from servicio_historial import (
+# Importaciones consistentes con la estructura de paquetes del proyecto.
+from ml.inferir import inferir, cargar_modelo
+from ml.interpretar import interpretar_fila
+from dashboard.servicios.servicio_historial import (
     guardar_deteccion,
     obtener_historial,
     obtener_estadisticas,
@@ -21,6 +17,7 @@ from servicio_historial import (
 
 
 def ejecutar_inferencia_y_guardar():
+    """Analiza telemetría con EdgeMant y persiste solo detecciones de la IA."""
     df_resultado, _ = inferir()
     _, scaler, columnas, umbral = cargar_modelo()
     guardados = 0
