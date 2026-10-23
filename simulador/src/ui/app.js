@@ -159,6 +159,7 @@ export function arrancar(contenedorRaiz) {
   mostrarTab('telemetria');
   sim.iniciar();
   window.__sim = sim;
+  window.__detenerIngesta = detenerIngesta;
   requestAnimationFrame(ciclo);
   return sim;
 }
