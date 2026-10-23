@@ -1,5 +1,6 @@
 import { crear, vaciar } from './dom.js';
 import { crearSimulador } from '../simulacion/simulador.js';
+import { conectarIngesta } from '../integracion/cliente_ingesta.js';
 import { crearDiagrama } from './diagrama.js';
 import { crearPanelTelemetria } from './paneles/telemetria.js';
 import { crearPanelEquipos, crearPanelControles } from './paneles/equipos.js';
@@ -19,6 +20,7 @@ const TABS = [
 
 export function arrancar(contenedorRaiz) {
   const sim = crearSimulador();
+  const detenerIngesta = conectarIngesta(sim);
   const raiz = vaciar(contenedorRaiz || document.getElementById('app'));
   raiz.classList.add('aplicacion');
 
