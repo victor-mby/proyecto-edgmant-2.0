@@ -16,9 +16,14 @@ class TestProcesadorML(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tempdir.name) / "edgemant.db"
 
-        with sqlite3.connect(self.db_path) as conn:
+        # El gestor de contexto de sqlite3 confirma o revierte transacciones,
+        # pero no cierra la conexión; se cierra explícitamente para Windows.
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
             conn.executescript(VIEW_PATH.read_text(encoding="utf-8"))
+        finally:
+            conn.close()
 
     def tearDown(self):
         self.tempdir.cleanup()
