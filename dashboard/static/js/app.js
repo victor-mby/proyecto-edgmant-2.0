@@ -1,294 +1,195 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const boton = document.getElementById('btn-inferir');
-    if (boton) boton.addEventListener('click', ejecutarInferencia);
-    cargarDashboard();
-});
+    const diagnostico = document.getElementById('diagnostico-texto');
+    const estadoTitulo = document.getElementById('estado-titulo');
+    const prioridad = document.getElementById('estado-prioridad');
+    const conexion = document.getElementById('conexion-estado');
+    const hora = document.getElementById('hora-analisis');
+    const conversacion = document.getElementById('conversacion');
+    const formulario = document.getElementById('form-pregunta');
+    const entrada = document.getElementById('pregunta-operador');
+    let ultimoDiagnostico = '';
+    let apoyoActual = null;
+    let actualizando = false;
 
-async function cargarDashboard() {
-    try {
-        const resp = await fetch('/api/dashboard');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const datos = await resp.json();
-        const estadisticas = datos.estadisticas || {};
+    const preguntas = {
+        '¿Cuál es la posible causa?': 'causa',
+        '¿Qué debo revisar primero?': 'revisar',
+        '¿Cómo confirmo que se solucionó?': 'recuperacion'
+    };
 
-        document.getElementById('total-registros').textContent = estadisticas.total_registros ?? 0;
-        document.getElementById('total-anomalias').textContent = estadisticas.total_detecciones ?? 0;
-        document.getElementById('total-motores').textContent = (datos.motores || []).length;
-        document.getElementById('umbral').textContent =
-            Number.isFinite(estadisticas.umbral) ? estadisticas.umbral.toFixed(6) : '-';
-
-        const tbody = document.querySelector('#tabla-anomalias tbody');
-        tbody.replaceChildren();
-        const historial = datos.historial || [];
-        actualizarApoyoOperador(datos.apoyo_operador || null);
-        historial.forEach((deteccion) => {
-            const tr = document.createElement('tr');
-            const valores = [
-                deteccion.fecha || '-',
-                deteccion.hora || '-',
-                deteccion.motor_id || '-',
-            ];
-            valores.forEach((valor) => {
-                const td = document.createElement('td');
-                td.textContent = String(valor);
-                tr.appendChild(td);
-            });
-
-            const tdSeveridad = document.createElement('td');
-            const etiqueta = document.createElement('span');
-            etiqueta.className = `severidad ${String(deteccion.severidad || '').replace(/[^a-zA-Z_-]/g, '')}`;
-            etiqueta.textContent = deteccion.severidad || '-';
-            tdSeveridad.appendChild(etiqueta);
-            tr.appendChild(tdSeveridad);
-
-            const tdError = document.createElement('td');
-            const error = Number(deteccion.error_reconstruccion);
-            tdError.textContent = Number.isFinite(error) ? error.toFixed(4) : '-';
-            tr.appendChild(tdError);
-
-            const tdInterpretacion = document.createElement('td');
-            tdInterpretacion.textContent = deteccion.tipo_interpretacion || '-';
-            tr.appendChild(tdInterpretacion);
-            tbody.appendChild(tr);
+    function escribirTexto(elemento, texto, velocidad = 13) {
+        return new Promise((resolve) => {
+            elemento.textContent = '';
+            let indice = 0;
+            const cursor = document.createElement('span');
+            cursor.className = 'cursor-escritura';
+            cursor.setAttribute('aria-hidden', 'true');
+            elemento.appendChild(cursor);
+            const intervalo = window.setInterval(() => {
+                if (indice >= texto.length) {
+                    window.clearInterval(intervalo);
+                    cursor.remove();
+                    resolve();
+                    return;
+                }
+                cursor.insertAdjacentText('beforebegin', texto.slice(indice, indice + 2));
+                indice += 2;
+            }, velocidad);
         });
-
-        const contenedorMotores = document.getElementById('lista-motores');
-        contenedorMotores.replaceChildren();
-        (datos.motores || []).forEach((motor) => {
-            const tarjeta = document.createElement('div');
-            tarjeta.className = 'motor-card';
-            const titulo = document.createElement('h3');
-            titulo.textContent = String(motor);
-            const detalle = document.createElement('p');
-            detalle.textContent = 'Motor registrado en la base de datos.';
-            tarjeta.append(titulo, detalle);
-            contenedorMotores.appendChild(tarjeta);
-        });
-        dibujarGrafico(historial);
-    } catch (error) {
-        console.error('Error cargando dashboard:', error);
-        const estado = document.getElementById('estado-inferencia');
-        if (estado) estado.textContent = 'No se pudo cargar el dashboard. Revisa la base de datos y el servidor.';
-    }
-}
-
-function actualizarApoyoOperador(apoyo) {
-    const estado = document.getElementById('apoyo-estado');
-    const contenedor = document.getElementById('apoyo-contenido');
-    if (!estado || !contenedor) return;
-
-    contenedor.replaceChildren();
-    if (!apoyo) {
-        estado.className = 'apoyo-operador__estado';
-        estado.textContent = 'SIN DATOS';
-        const mensaje = document.createElement('p');
-        mensaje.className = 'apoyo-operador__vacio';
-        mensaje.textContent = 'No se pudo obtener el plan de apoyo. Recarga el dashboard para volver a consultar los resultados.';
-        contenedor.appendChild(mensaje);
-        return;
     }
 
-    const modo = String(apoyo.estado || 'VIGILANCIA').toUpperCase();
-    estado.className = 'apoyo-operador__estado';
-    if (modo === 'VALIDAR_MODELO') {
-        estado.classList.add('apoyo-operador__estado--validar');
-        estado.textContent = 'VALIDAR MODELO';
-    } else if (modo === 'REVISION_TECNICA') {
-        const severidad = String(apoyo.deteccion?.severidad_modelo || '').toUpperCase();
-        estado.classList.add(severidad === 'CRITICO'
-            ? 'apoyo-operador__estado--critico'
-            : 'apoyo-operador__estado--atencion');
-        estado.textContent = severidad === 'CRITICO' ? 'REVISIÓN PRIORITARIA' : 'REVISAR';
-    } else {
-        estado.textContent = 'VIGILANCIA';
-    }
-
-    const titulo = document.createElement('h3');
-    titulo.className = 'apoyo-operador__titulo';
-    titulo.textContent = apoyo.titulo || 'Apoyo operativo';
-
-    const resumen = document.createElement('p');
-    resumen.className = 'apoyo-operador__resumen';
-    resumen.textContent = apoyo.resumen || '';
-
-    contenedor.append(titulo, resumen);
-
-    const deteccionesRevision = Number(apoyo.detecciones_pendientes_revision || 0);
-    if (deteccionesRevision > 0) {
-        const revision = document.createElement('div');
-        revision.className = 'apoyo-operador__alerta apoyo-operador__alerta--modelo';
-        const revisionTitulo = document.createElement('strong');
-        revisionTitulo.textContent = 'Historial conservado para revisión';
-        const revisionTexto = document.createElement('p');
-        revisionTexto.textContent = deteccionesRevision
-            + ' detecciones anteriores se conservan en la base de datos, pero no se presentan como alertas vigentes porque su motor no estaba en estado OPERATIVO. No se eliminaron las capturas de telemetría.';
-        revision.append(revisionTitulo, revisionTexto);
-        contenedor.appendChild(revision);
-    }
-
-    if (apoyo.advertencia) {
-        const advertencia = document.createElement('div');
-        advertencia.className = modo === 'VALIDAR_MODELO'
-            ? 'apoyo-operador__alerta apoyo-operador__alerta--modelo'
-            : 'apoyo-operador__alerta';
-        const subtitulo = document.createElement('strong');
-        subtitulo.textContent = modo === 'VALIDAR_MODELO'
-            ? 'Control de calidad del modelo'
-            : 'Precaución';
-        const texto = document.createElement('p');
-        texto.textContent = apoyo.advertencia;
-        advertencia.append(subtitulo, texto);
-        contenedor.appendChild(advertencia);
-    }
-
-    const deteccion = apoyo.deteccion;
-    if (deteccion) {
-        const metadatos = document.createElement('p');
-        metadatos.className = 'apoyo-operador__metadatos';
-        const datosMeta = [
-            'Motor: ' + (deteccion.motor_id || 'No identificado'),
-            'Fecha: ' + (deteccion.fecha || 'No disponible'),
-            'Hora: ' + (deteccion.hora || 'No disponible'),
-            'Severidad del modelo: ' + (deteccion.severidad_modelo || 'No clasificada'),
-        ];
-        if (Number.isFinite(deteccion.error_reconstruccion)) {
-            datosMeta.push('Error: ' + deteccion.error_reconstruccion.toFixed(4));
-        }
-        if (Number.isFinite(deteccion.umbral)) {
-            datosMeta.push('Umbral: ' + deteccion.umbral.toFixed(6));
-        }
-        metadatos.textContent = datosMeta.join(' · ');
-        contenedor.appendChild(metadatos);
-    }
-
-    const accionesTitulo = document.createElement('strong');
-    accionesTitulo.className = 'apoyo-operador__seccion-titulo';
-    accionesTitulo.textContent = modo === 'VALIDAR_MODELO'
-        ? 'Comprobaciones previas a interpretar la alerta'
-        : 'Pasos sugeridos para el operador';
-
-    const listaAcciones = document.createElement('ol');
-    listaAcciones.className = 'apoyo-operador__acciones';
-    (Array.isArray(apoyo.acciones) ? apoyo.acciones : []).forEach((accion) => {
-        const item = document.createElement('li');
-        item.textContent = String(accion);
-        listaAcciones.appendChild(item);
-    });
-    contenedor.append(accionesTitulo, listaAcciones);
-
-    const variables = Array.isArray(apoyo.variables) ? apoyo.variables : [];
-    if (variables.length) {
-        const variablesTitulo = document.createElement('strong');
-        variablesTitulo.className = 'apoyo-operador__seccion-titulo';
-        variablesTitulo.textContent = 'Variables señaladas por la interpretación';
-        const etiquetas = document.createElement('div');
-        etiquetas.className = 'apoyo-operador__variables';
-        const nombres = {
-            nivel: 'Nivel', nivel_porcentaje: 'Nivel (%)',
-            voltaje: 'Tensión de red', voltaje_terminal: 'Tensión terminal',
-            amperaje: 'Amperaje', corriente_total: 'Corriente total',
-            caudal: 'Caudal', potencia: 'Potencia', carga: 'Carga',
-            altura: 'Altura', factor_potencia: 'Factor de potencia',
-            caudal_total: 'Caudal total', potencia_total: 'Potencia total',
-            nivel_destino: 'Nivel destino', demanda: 'Demanda',
-            posicion_valvula: 'Posición de válvula',
-            velocidad_rotacion: 'Velocidad de rotación',
-            horas_operacion: 'Horas de operación'
+    function textoDiagnostico(apoyo) {
+        if (!apoyo) return {
+            titulo: 'Estado no disponible',
+            prioridad: 'SIN DATOS',
+            texto: 'No pude consultar el estado actual. Comprueba que el dashboard y el receptor de telemetría estén funcionando.'
         };
-        variables.forEach((variable) => {
-            const etiquetaVariable = document.createElement('span');
-            etiquetaVariable.className = 'apoyo-operador__variable';
-            etiquetaVariable.textContent = nombres[variable] || String(variable);
-            etiquetas.appendChild(etiquetaVariable);
-        });
-        contenedor.append(variablesTitulo, etiquetas);
-    }
-
-    if (Number.isFinite(apoyo.porcentaje_anomalias)) {
-        const tasa = document.createElement('p');
-        tasa.className = 'apoyo-operador__metadatos';
-        tasa.textContent = 'Registros clasificados como posibles anomalías: '
-            + apoyo.porcentaje_anomalias.toFixed(2) + '% del total almacenado.';
-        contenedor.appendChild(tasa);
-    }
-}
-
-function dibujarGrafico(historial) {
-    const canvas = document.getElementById('grafico-error');
-    if (!canvas) return;
-    const contexto = canvas.getContext('2d');
-    if (!contexto) return;
-
-    const ancho = Math.max(canvas.clientWidth, 320);
-    const alto = 220;
-    const escalaDpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(ancho * escalaDpr);
-    canvas.height = Math.floor(alto * escalaDpr);
-    canvas.style.height = `${alto}px`;
-    contexto.setTransform(escalaDpr, 0, 0, escalaDpr, 0, 0);
-    contexto.clearRect(0, 0, ancho, alto);
-
-    const puntos = historial
-        .map((fila) => ({
-            error: Number(fila.error_reconstruccion),
-            umbral: Number(fila.umbral),
-        }))
-        .filter((fila) => Number.isFinite(fila.error) && Number.isFinite(fila.umbral));
-    if (!puntos.length) {
-        contexto.fillText('Aún no hay detecciones para graficar.', 12, 24);
-        return;
-    }
-
-    const margen = { izquierda: 42, derecha: 12, arriba: 12, abajo: 28 };
-    const anchoUtil = ancho - margen.izquierda - margen.derecha;
-    const altoUtil = alto - margen.arriba - margen.abajo;
-    const maximo = Math.max(...puntos.flatMap((p) => [p.error, p.umbral]), 0.000001) * 1.1;
-    const x = (i) => margen.izquierda + (puntos.length === 1 ? anchoUtil / 2 : i * anchoUtil / (puntos.length - 1));
-    const y = (valor) => margen.arriba + altoUtil - (valor / maximo) * altoUtil;
-
-    contexto.beginPath();
-    contexto.moveTo(margen.izquierda, margen.arriba);
-    contexto.lineTo(margen.izquierda, margen.arriba + altoUtil);
-    contexto.lineTo(ancho - margen.derecha, margen.arriba + altoUtil);
-    contexto.stroke();
-
-    contexto.beginPath();
-    puntos.forEach((p, i) => {
-        if (i === 0) contexto.moveTo(x(i), y(p.error));
-        else contexto.lineTo(x(i), y(p.error));
-    });
-    contexto.stroke();
-
-    contexto.setLineDash([5, 4]);
-    const umbralMedio = puntos.reduce((suma, p) => suma + p.umbral, 0) / puntos.length;
-    contexto.beginPath();
-    contexto.moveTo(margen.izquierda, y(umbralMedio));
-    contexto.lineTo(ancho - margen.derecha, y(umbralMedio));
-    contexto.stroke();
-    contexto.setLineDash([]);
-
-    contexto.fillText('Error de reconstrucción', margen.izquierda, alto - 8);
-    contexto.fillText('Umbral medio', ancho - 112, alto - 8);
-}
-
-async function ejecutarInferencia() {
-    const estado = document.getElementById('estado-inferencia');
-    const boton = document.getElementById('btn-inferir');
-    estado.textContent = 'Ejecutando inferencia...';
-    if (boton) boton.disabled = true;
-
-    try {
-        const resp = await fetch('/api/inferir', { method: 'POST' });
-        const datos = await resp.json();
-        if (!resp.ok || datos.ok === false) {
-            throw new Error(datos.error || `HTTP ${resp.status}`);
+        const estado = String(apoyo.estado || 'VIGILANCIA').toUpperCase();
+        if (estado === 'VALIDAR_MODELO') {
+            return {
+                titulo: 'Diagnóstico pendiente de validación',
+                prioridad: 'VALIDAR MODELO',
+                texto: (apoyo.resumen || 'Los resultados del modelo necesitan validación.')
+                    + '\n\n' + (apoyo.advertencia || 'No se puede confirmar una avería con la clasificación actual.')
+                    + '\n\nPrimero hay que validar la calidad de la evaluación. No atribuiré una falla física mientras los resultados no sean confiables.'
+            };
         }
-        estado.textContent = `Inferencia completada. Nuevas detecciones guardadas: ${datos.detecciones_guardadas}`;
-        await cargarDashboard();
-    } catch (error) {
-        estado.textContent = `Error en la inferencia: ${error.message}`;
-        console.error('Error ejecutando inferencia:', error);
-    } finally {
-        if (boton) boton.disabled = false;
+        if (estado === 'VIGILANCIA') {
+            return {
+                titulo: 'Estación en vigilancia',
+                prioridad: 'VIGILANCIA',
+                texto: 'No hay una detección vigente disponible para establecer una causa específica. Continúo pendiente de nuevos datos operativos. Si observas una condición anormal, verifica la alarma correspondiente y el procedimiento de la estación.'
+            };
+        }
+        const deteccion = apoyo.deteccion || {};
+        const acciones = Array.isArray(apoyo.acciones) ? apoyo.acciones : [];
+        const causa = deteccion.tipo_interpretacion || apoyo.titulo || 'Comportamiento fuera del patrón esperado';
+        const pasos = acciones.slice(0, 2).map((a, i) => (i + 1) + '. ' + a).join('\n');
+        return {
+            titulo: causa,
+            prioridad: String(deteccion.severidad_modelo || 'REVISAR').toUpperCase(),
+            texto: 'He detectado un comportamiento que requiere revisión en ' + (deteccion.motor_id || 'un motor de la estación') + '.\n\nPosible causa: ' + causa + '.\n\nQué revisar primero:\n' + (pasos || 'Contrasta el estado actual con las señales operativas y el procedimiento técnico de la estación.') + '\n\nEsta es una causa posible, no una avería confirmada. Verifica las condiciones antes de intervenir.'
+        };
     }
-}
+
+    async function cargarEstado(forzar = false) {
+        if (actualizando) return;
+        actualizando = true;
+        try {
+            const respuesta = await fetch('/api/dashboard', { cache: 'no-store' });
+            if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
+            const datos = await respuesta.json();
+            if (datos.ok === false) throw new Error(datos.error || 'No se pudo consultar el estado');
+            apoyoActual = datos.apoyo_operador || null;
+            conexion.innerHTML = '<span class="punto"></span> Conectado';
+            conexion.classList.add('conectado');
+            const diagnosticoActual = textoDiagnostico(apoyoActual);
+            const clave = JSON.stringify(diagnosticoActual);
+            if (forzar || clave !== ultimoDiagnostico) {
+                ultimoDiagnostico = clave;
+                estadoTitulo.textContent = '';
+                await escribirTexto(estadoTitulo, diagnosticoActual.titulo, 20);
+                prioridad.textContent = diagnosticoActual.prioridad;
+                prioridad.className = 'prioridad ' + clasePrioridad(diagnosticoActual.prioridad);
+                hora.textContent = new Date().toLocaleTimeString('es-PE', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+                await escribirTexto(diagnostico, diagnosticoActual.texto, 9);
+                actualizarPreguntas(diagnosticoActual.prioridad);
+            }
+        } catch (error) {
+            conexion.innerHTML = '<span class="punto"></span> Sin conexión';
+            conexion.classList.remove('conectado');
+            if (!ultimoDiagnostico) {
+                estadoTitulo.textContent = 'No se pudo consultar el estado';
+                diagnostico.textContent = 'Comprueba que el dashboard y el receptor estén activos. No puedo emitir un diagnóstico sin consultar los datos actuales.';
+            }
+            console.error('Error consultando estado de EdgeMant:', error);
+        } finally {
+            actualizando = false;
+        }
+    }
+
+    function clasePrioridad(texto) {
+        const valor = String(texto).toUpperCase();
+        if (valor.includes('CRITICO') || valor.includes('CRÍTICO') || valor.includes('PRIORITARIA')) return 'prioridad-critica';
+        if (valor.includes('VALIDAR') || valor.includes('ATENCION') || valor.includes('ATENCIÓN') || valor.includes('REVISAR')) return 'prioridad-atencion';
+        return 'prioridad-normal';
+    }
+
+    function actualizarPreguntas(prioridadActual) {
+        const contenedor = document.getElementById('preguntas-rapidas');
+        const textos = prioridadActual === 'VALIDAR MODELO'
+            ? ['¿Por qué no se puede confirmar la falla?', '¿Qué se debe validar primero?', '¿Cómo verifico el resultado?']
+            : ['¿Cuál es la posible causa?', '¿Qué debo revisar primero?', '¿Cómo confirmo que se solucionó?'];
+        contenedor.replaceChildren();
+        textos.forEach((texto) => {
+            const boton = document.createElement('button');
+            boton.type = 'button';
+            boton.className = 'pregunta-btn';
+            boton.textContent = texto;
+            boton.addEventListener('click', () => responderPregunta(texto));
+            contenedor.appendChild(boton);
+        });
+    }
+
+    function agregarMensaje(clase, autor, texto, animar = false) {
+        const mensaje = document.createElement('div');
+        mensaje.className = 'mensaje ' + clase;
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar-edgemant';
+        avatar.textContent = clase === 'mensaje-edgemant' ? 'E' : 'O';
+        const cuerpo = document.createElement('div');
+        cuerpo.className = 'mensaje-cuerpo';
+        const cabecera = document.createElement('div');
+        cabecera.className = 'mensaje-autor';
+        cabecera.textContent = autor;
+        const parrafo = document.createElement('p');
+        cuerpo.append(cabecera, parrafo);
+        mensaje.append(avatar, cuerpo);
+        conversacion.appendChild(mensaje);
+        if (animar) escribirTexto(parrafo, texto, 10);
+        else parrafo.textContent = texto;
+        mensaje.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+
+    function responderPregunta(pregunta) {
+        const texto = String(pregunta || '').trim();
+        if (!texto) return;
+        agregarMensaje('mensaje-operador', 'Operador', texto);
+        const apoyo = apoyoActual || {};
+        const acciones = Array.isArray(apoyo.acciones) ? apoyo.acciones : [];
+        const clave = preguntas[texto] || (texto.toLowerCase().includes('causa') ? 'causa'
+            : texto.toLowerCase().includes('revis') || texto.toLowerCase().includes('validar') ? 'revisar'
+            : texto.toLowerCase().includes('solucion') || texto.toLowerCase().includes('recuper') ? 'recuperacion' : 'general');
+        let respuesta;
+        if (apoyo.estado === 'VALIDAR_MODELO') {
+            respuesta = clave === 'revisar'
+                ? 'Lo primero es validar que las variables, unidades, escalador y versión del modelo coincidan. La tasa actual de alertas no permite atribuir una avería física con confianza.'
+                : 'No puedo confirmar una causa física todavía: la evaluación del modelo requiere validación. ' + (apoyo.advertencia || 'Contrasta las lecturas con las señales operativas y los procedimientos de la estación.');
+        } else if (clave === 'causa') {
+            respuesta = apoyo.deteccion?.tipo_interpretacion
+                ? 'La posible causa indicada por la interpretación actual es: ' + apoyo.deteccion.tipo_interpretacion + '. Es una hipótesis que debe contrastarse con las señales de la estación.'
+                : 'Aún no hay evidencia suficiente para proponer una causa específica. Necesito una detección válida o una condición operativa confirmada.';
+        } else if (clave === 'revisar') {
+            respuesta = acciones.slice(0, 2).join(' ') || 'Comprueba el estado de la estación, la alarma operativa relacionada y el procedimiento de seguridad antes de intervenir.';
+        } else if (clave === 'recuperacion') {
+            respuesta = 'Compara las nuevas lecturas con el rango operativo normal, confirma que la alarma haya desaparecido y verifica que la condición se mantenga estable durante varias capturas. Sigue el procedimiento de la estación.';
+        } else {
+            respuesta = 'Puedo orientar sobre la posible causa, las primeras comprobaciones y cómo verificar la recuperación. Para un diagnóstico más específico se necesita integrar un modelo de lenguaje con acceso a la telemetría y los manuales técnicos.';
+        }
+        agregarMensaje('mensaje-edgemant', 'EdgeMant', respuesta, true);
+    }
+
+    document.querySelectorAll('.pregunta-btn').forEach((boton) => {
+        boton.addEventListener('click', () => responderPregunta(boton.textContent));
+    });
+    formulario.addEventListener('submit', (evento) => {
+        evento.preventDefault();
+        const pregunta = entrada.value.trim();
+        if (!pregunta) return;
+        entrada.value = '';
+        responderPregunta(pregunta);
+    });
+
+    cargarEstado(true);
+    window.setInterval(() => cargarEstado(false), 5000);
+});
