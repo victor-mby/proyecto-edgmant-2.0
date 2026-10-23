@@ -21,7 +21,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-DB_PATH = ROOT_DIR / "base_datos" / "edgemant.db
+DB_PATH = ROOT_DIR / "base_datos" / "edgemant.db"
 SCHEMA_PATH = ROOT_DIR / "base_datos" / "base_datos.sql"
 VIEW_PATH = ROOT_DIR / "base_datos" / "view_ml.sql"
 
